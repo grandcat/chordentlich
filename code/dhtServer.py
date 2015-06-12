@@ -7,7 +7,7 @@ import helpers
 import asyncio
 from multiprocessing import Process
 import getopt, sys
-
+import json
 
 class DHTAsyncClient(asyncio.Protocol):
 	def __init__(self, msg, loop4):
@@ -41,7 +41,7 @@ class DHTAsyncServer(asyncio.Protocol):
 		server2 = self.serverConnections.get("1338")
 
 		if server2 is None or not server2.connected:
-			protocol, server2 = yield from loop.create_connection(lambda: DHTAsyncClient("messagetoother server", loop),
+			protocol, server2 = yield from loop.create_connection(lambda: DHTAsyncClient(data, loop),
 																  '127.0.0.1', 1338)
 			server2.server_transport = self.transport
 			self.serverConnections["1338"] = server2
@@ -55,14 +55,23 @@ class DHTAsyncServer(asyncio.Protocol):
 		self.transport = transport
 
 	def data_received(self, data):
-
-		msg = data.decode()
-
-		if msg == "client_cmd_dht_store":
+		print("DATA IS" + data.decode())
+		msg = json.loads(data.decode())
+		print (msg)
+		if msg["action"] == "client_dht_store":
 			print("GOT DHT STORE COMMAND")
-			asyncio.Task(self.send_data("lalala"))
 
-		self.transport.write(" ok".encode())  # send back
+			message = json.dumps({
+				"action": "FIND_SUCCESSOR"
+			})
+			asyncio.Task(self.send_data(message))
+
+		elif msg["action"] == "FIND_SUCCESSOR":
+			print ("got find successor request")
+
+		self.transport.write( json.dumps({
+			"STATUS": "OK"
+		}).encode()) # send back
 		self.transport.close()
 
 # Parse console arguments
@@ -93,7 +102,10 @@ def connectClient():
 	sock.connect(server_address)
 	print("2")
 	try:
-		message = 'client_cmd_dht_store'
+
+		message = json.dumps({
+			"action": "client_dht_store",
+		})
 		sock.sendall(bytes(message, 'UTF-8'))
 
 		amount_received = 0
