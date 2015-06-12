@@ -4,7 +4,7 @@ import threading
 import time
 import socket
 import asyncio
-from multiprocessing import Process 
+from multiprocessing import Process
 
 class DHTAsync(asyncio.Protocol):
 
@@ -32,6 +32,6 @@ class DHTAsync(asyncio.Protocol):
 		self.loop.stop()
 
 loop = asyncio.get_event_loop()
-loop.run_until_complete( loop.create_connection(lambda: DHTAsync('Some command to server', loop),'127.0.0.1', 1666))
-loop.run_forever()
+loop.run_until_complete( loop.create_connection(lambda: DHTAsync('Some command to server', loop),
+'127.0.0.1', 1339)) # send to 1339
 loop.close()

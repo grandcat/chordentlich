@@ -5,7 +5,5 @@ do
 	((port=1337 + $p))
 	echo "Starting node on $port"
 	gnome-terminal -x python3 dhtServer.py -p $port
+	 sleep 1
 done
-
-echo "Start a client...."
-gnome-terminal -x python3 dht.py
