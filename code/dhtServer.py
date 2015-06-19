@@ -1,13 +1,26 @@
+
 #!/usr/bin/python3
 
+import copy
 import threading
 import time
 import socket
 import helpers
 import asyncio
+import hashlib
 from multiprocessing import Process
 import getopt, sys
 import json
+from jsonschema import validate, Draft4Validator
+import msg_schemata
+
+schema = {
+    "action": {"type": "string"},
+    "key": {"type": "string"},
+}
+
+PORT_START = None
+SERVER_COUNT = None
 
 class DHTAsyncClient(asyncio.Protocol):
 	def __init__(self, msg, loop4):
@@ -34,6 +47,12 @@ class DHTAsyncClient(asyncio.Protocol):
 class DHTAsyncServer(asyncio.Protocol):
 	serverConnections = {}  # remember active connections
 
+	def __init__(self, server_address, port):
+		self.server_address = server_address
+		self.port = port
+
+		print("My key: ", self.get_key())
+
 	@asyncio.coroutine
 	def send_data(self, data):
 
@@ -41,8 +60,7 @@ class DHTAsyncServer(asyncio.Protocol):
 		server2 = self.serverConnections.get("1338")
 
 		if server2 is None or not server2.connected:
-			protocol, server2 = yield from loop.create_connection(lambda: DHTAsyncClient(data, loop),
-																  '127.0.0.1', 1338)
+			protocol, server2 = yield from loop.create_connection(lambda: DHTAsyncClient(data, loop), '127.0.0.1', 1338)
 			server2.server_transport = self.transport
 			self.serverConnections["1338"] = server2
 
@@ -55,41 +73,73 @@ class DHTAsyncServer(asyncio.Protocol):
 		self.transport = transport
 
 	def data_received(self, data):
-		print("DATA IS" + data.decode())
+		# Warning: do not call data.decode() twice
+		#print("DATA IS" + data.decode())
 		msg = json.loads(data.decode())
-		print (msg)
-		if msg["action"] == "client_dht_store":
+		print(msg)
+		if msg["action"] == "client_debug":
 			print("GOT DHT STORE COMMAND")
 
 			message = json.dumps({
-				"action": "FIND_SUCCESSOR"
+				"action": "FIND_SUCCESSOR",
+				"key": self.get_keytemp("127.0.0.1", 1338),
+				#"source_identity": self.get_key(),
+				"source_port": self.port,
+				"source_ip" : self.server_address
 			})
 			asyncio.Task(self.send_data(message))
 
 		elif msg["action"] == "FIND_SUCCESSOR":
-			print ("got find successor request")
+			print("got find successor request")
+			if msg["key"] == self.get_key():
+				# We are the target
+				print("Sending reply to origin")
+			else:
+				# Forward message to next peer
+				new_msg = copy.deepcopy(msg)
+				# TODO: add trace
+				asyncio.Task(self.send_data(new_msg))
 
-		self.transport.write( json.dumps({
+		self.transport.write(json.dumps({
 			"STATUS": "OK"
-		}).encode()) # send back
+		}).encode())  # send back
 		self.transport.close()
 
+	def get_next_server(self):
+		ip_address = "localhost"
+		port = self.port + 1
+
+		return ip_address, port
+
+	# TODO: public key hash
+	def get_key(self):
+		return hashlib.sha256((self.server_address + str(self.port)).encode()).hexdigest()
+
+	def get_keytemp(self, address, port):
+		return hashlib.sha256((address + str(port)).encode()).hexdigest()
+
+
+
 # Parse console arguments
-opts, args = getopt.getopt(sys.argv[1:], "p:")
-port = 1339
+opts, args = getopt.getopt(sys.argv[1:], "p:s:c:")
+port = None
 for key, val in opts:
 	if key == "-p":
 		port = int(val)
+	elif key == "-s":
+		PORT_START = int(val)
+	elif key == "-c":
+		SERVER_COUNT = int(val)
 
-print("server port ", port)
+print("Port", port)
 print("-------------------")
 loop = asyncio.get_event_loop()
 loop.set_debug(True)
 
-
 @asyncio.coroutine
 def initialize(loop):
-	dhtServer = yield from loop.create_server(DHTAsyncServer, '127.0.0.1', port)
+	# TODO: improve passing of parameters
+	dhtServer = yield from loop.create_server(lambda: DHTAsyncServer('127.0.0.1', port), '127.0.0.1', port)
 	if port == 1339:
 		# make a local client
 		threading.Thread(target=connectClient).start()
@@ -104,8 +154,10 @@ def connectClient():
 	try:
 
 		message = json.dumps({
-			"action": "client_dht_store",
+			"action": "client_debug",
+			# "action": "FIND_SUCCESSOR",
 		})
+		# validate(message, schema)
 		sock.sendall(bytes(message, 'UTF-8'))
 
 		amount_received = 0
@@ -120,6 +172,7 @@ def connectClient():
 	finally:
 		sock.close()
 
-
+# Main
 asyncio.Task(initialize(loop))
 loop.run_forever()
+
