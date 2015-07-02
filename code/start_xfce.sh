@@ -7,5 +7,5 @@ do
 	((port=$port_start + $p))
 	echo "Starting node on $port"
 	xfce4-terminal -x python3 dhtServer.py -p $port -c $count -s $port_start
-	sleep 1
+
 done
