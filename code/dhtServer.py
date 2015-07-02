@@ -30,7 +30,7 @@ class DHTAsyncClient(asyncio.Protocol):
 	def connection_made(self, transport):
 		print('  Connected ', transport.get_extra_info('peername'))
 		self.transport = transport
-		transport.write(self.msg.encode())
+		# transport.write(self.msg.encode())
 
 	def data_received(self, data):
 		# Send message to server
@@ -45,11 +45,12 @@ class DHTAsyncClient(asyncio.Protocol):
 
 
 class DHTAsyncServer(asyncio.Protocol):
-	serverConnections = {}  # remember active connections
 
 	def __init__(self, server_address, port):
 		self.server_address = server_address
 		self.port = port
+
+		self.__serverConnections = {}  # remember active connections
 
 		print("My key: ", self.get_key())
 
@@ -57,14 +58,17 @@ class DHTAsyncServer(asyncio.Protocol):
 	def send_data(self, data):
 
 		print("  send data back..." + data)
-		server2 = self.serverConnections.get("1338")
+		server2 = self.__serverConnections.get("1338")
 
 		if server2 is None or not server2.connected:
 			protocol, server2 = yield from loop.create_connection(lambda: DHTAsyncClient(data, loop), '127.0.0.1', 1338)
 			server2.server_transport = self.transport
-			self.serverConnections["1338"] = server2
+			self.__serverConnections["1338"] = server2
+			print("Server2: ", data)
+
 
 		server2.transport.write(data.encode())
+		# server2.transport.close()
 
 	def connection_made(self, transport):
 
@@ -74,9 +78,14 @@ class DHTAsyncServer(asyncio.Protocol):
 
 	def data_received(self, data):
 		# Warning: do not call data.decode() twice
-		#print("DATA IS" + data.decode())
-		msg = json.loads(data.decode())
-		print(msg)
+		# print("DATA IS" + data.decode())
+		print("Start data_received.")
+		try:
+			print("Raw data: " + str(data))
+			msg = json.loads(data.decode())
+			print(msg)
+		except Exception as e:
+			print("JSON problem: " + str(e))
 		if msg["action"] == "client_debug":
 			print("GOT DHT STORE COMMAND")
 
