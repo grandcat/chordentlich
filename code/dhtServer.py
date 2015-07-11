@@ -12,7 +12,7 @@ import getopt
 import sys
 import json
 from jsonschema import validate, Draft4Validator
-from fingerTable import FingerTable
+from fingerTable import Node
 
 schema = {
     "action": {"type": "string"},
@@ -55,7 +55,7 @@ class DHTAsyncServer(asyncio.Protocol):
         self.host_address = host_address
         self.host_port = host_port
         self.bootstrap_address = bootstrap_address
-        self.fingerTable = FingerTable(self.get_key())
+        self.node = Node(self.get_key(), host_address, host_port, bootstrap_address)
         # Server state
         self.__serverConnections = {}  # remember active connections
 
@@ -101,8 +101,7 @@ class DHTAsyncServer(asyncio.Protocol):
 
             # is it a botstrap node?
 
-            for i in range(FingerTable.chordFingerTableSize):
-                self.fingerTable.entries.append("123")
+            self.node.initFingerTable()
 
 
             message = json.dumps({
@@ -138,10 +137,11 @@ class DHTAsyncServer(asyncio.Protocol):
 
     # TODO: public key hash
     def get_key(self):
-        return hashlib.sha256((self.host_address + str(self.host_port)).encode()).hexdigest()
+        # TODO: remove modulo
+        return int(hashlib.sha256((self.host_address + str(self.host_port)).encode()).hexdigest(), 16) % Node.chordRingSize
 
     def get_keytemp(self, address, port):
-        return hashlib.sha256((address + str(port)).encode()).hexdigest()
+        return int(hashlib.sha256((address + str(port)).encode()).hexdigest(), 16) % Node.chordRingSize
 
 
 @asyncio.coroutine
