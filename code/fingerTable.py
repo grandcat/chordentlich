@@ -4,27 +4,32 @@ import hashlib
 import math
 import datetime
 
-chordFingerTableSize = 6; # TODO: 256
-chordRingSize = 2**chordFingerTableSize; # Maximum number of addresses in the Chord network
-
 class FingerTable():
+    chordFingerTableSize = 6  # TODO: 256
+    chordRingSize = 2**chordFingerTableSize  # Maximum number of addresses in the Chord network
+
     def __init__(self, nodeId):
         self.nodeId = int(nodeId, 16) # make integer for calculations
         self.entries = []
+
     def getEntry(self, position):
         addition = 2**(position-1)
-        entry = (self.nodeId + addition) % chordRingSize
+        entry = (self.nodeId + addition) % self.chordRingSize
         return hex(entry)
+
     def initFingerTable(self):
+
         pass
         #self.fingerTable.append()
+
     def getClosestPrecedingFinder(self, searchKey):
-        for k in range(chordFingerTableSize, 0, -1):
+        for k in range(self.chordFingerTableSize, 0, -1):
             if  int(searchKey, 16) > int(self.getEntry(k), 16):
                 return self.getEntry(k+1)
 
         return hex(self.nodeId)
 
+    @property
     def getNodeId(self):
         return self.nodeId
 

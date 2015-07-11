@@ -12,8 +12,7 @@ import getopt
 import sys
 import json
 from jsonschema import validate, Draft4Validator
-import msg_schemata
-import fingerTable
+from fingerTable import FingerTable
 
 schema = {
     "action": {"type": "string"},
@@ -46,16 +45,21 @@ class DHTAsyncClient(asyncio.Protocol):
         # self.loop4.stop()
         print("Client  Connection Lost")
 
-
 class DHTAsyncServer(asyncio.Protocol):
+    """
+    Independent DHT node acting as a server or even bootstrap node.
+    """
 
-    def __init__(self, server_address, port, bootstrapNode=None):
-        self.server_address = server_address
-        self.port = port
-        self.fingerTable = fingerTable.FingerTable(self.get_key())
+    def __init__(self, host_address, host_port, bootstrap_address=None):
+        # Node
+        self.host_address = host_address
+        self.host_port = host_port
+        self.bootstrap_address = bootstrap_address
+        self.fingerTable = FingerTable(self.get_key())
+        # Server state
         self.__serverConnections = {}  # remember active connections
-        self.bootstrapNode = bootstrapNode
-        print("Bootstrap Node")
+
+        print("Address/Port of Bootstrap Node: ", bootstrap_address)
         print("My key: ", self.get_key())
 
     @asyncio.coroutine
@@ -90,14 +94,14 @@ class DHTAsyncServer(asyncio.Protocol):
         except Exception as e:
             print("JSON problem: " + str(e))
         if msg["action"] == "client_start":
-            print("GOT DHT STORE COMMAND")
+            print("GOT DHT client_start COMMAND")
 
             # Firs twe JOIN the Chord network. Therefore we initialize the
             # finger Table with start values
 
             # is it a botstrap node?
 
-            for i in range(fingerTable.chordFingerTableSize):
+            for i in range(FingerTable.chordFingerTableSize):
                 self.fingerTable.entries.append("123")
 
 
@@ -105,8 +109,8 @@ class DHTAsyncServer(asyncio.Protocol):
                 "action": "FIND_SUCCESSOR",
                 "key": self.get_keytemp("127.0.0.1", 1338),
                 #"source_identity": self.get_key(),
-                "source_port": self.port,
-                "source_ip" : self.server_address
+                "source_port": self.host_port,
+                "source_ip" : self.host_address
             })
             asyncio.Task(self.send_data(message))
 
@@ -128,41 +132,24 @@ class DHTAsyncServer(asyncio.Protocol):
 
     def get_next_server(self):
         ip_address = "localhost"
-        port = self.port + 1
+        port = self.host_port + 1
 
         return ip_address, port
 
     # TODO: public key hash
     def get_key(self):
-        return hashlib.sha256((self.server_address + str(self.port)).encode()).hexdigest()
+        return hashlib.sha256((self.host_address + str(self.host_port)).encode()).hexdigest()
 
     def get_keytemp(self, address, port):
         return hashlib.sha256((address + str(port)).encode()).hexdigest()
 
 
-
-# Parse console arguments
-opts, args = getopt.getopt(sys.argv[1:], "p:s:c:")
-port = None
-for key, val in opts:
-    if key == "-p":
-        port = int(val)
-    elif key == "-s":
-        PORT_START = int(val)
-    elif key == "-c":
-        SERVER_COUNT = int(val)
-
-print("Port", port)
-print("-------------------")
-loop = asyncio.get_event_loop()
-loop.set_debug(True)
-
 @asyncio.coroutine
-def initialize(loop):
+def initialize(loop, port):
     # TODO: improve passing of parameters
 
-    boostrapNodePort = 1339 if port==1339 else None
-    dhtServer = yield from loop.create_server(lambda: DHTAsyncServer('127.0.0.1', port, bootstrapNode=boostrapNodePort), '127.0.0.1', port)
+    boostrapNodePort = 1339 if port!=1339 else None
+    dhtServer = yield from loop.create_server(lambda: DHTAsyncServer('127.0.0.1', port, bootstrap_address=boostrapNodePort), '127.0.0.1', port)
     if port == 1339:
         # make a local client
         threading.Thread(target=connectClient).start()
@@ -177,7 +164,6 @@ def connectClient():
 
         message = json.dumps({
             "action": "client_start",
-
             # "action": "FIND_SUCCESSOR",
         })
 
@@ -196,6 +182,25 @@ def connectClient():
     finally:
         sock.close()
 
-# Main
-asyncio.Task(initialize(loop))
+"""
+Main application
+"""
+# Parse console arguments
+opts, args = getopt.getopt(sys.argv[1:], "p:s:c:")
+port = None
+for key, val in opts:
+    if key == "-p":
+        port = int(val)
+    elif key == "-s":
+        PORT_START = int(val)
+    elif key == "-c":
+        SERVER_COUNT = int(val)
+
+print("Port", port)
+print("-------------------")
+
+# Start async server
+loop = asyncio.get_event_loop()
+loop.set_debug(True)
+asyncio.Task(initialize(loop, port))
 loop.run_forever()
