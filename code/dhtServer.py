@@ -13,6 +13,12 @@ import sys
 import json
 from jsonschema import validate, Draft4Validator
 from fingerTable import Node
+from enum import Enum
+
+# Save status to manage async calls.. TODO: Exclude this in a new file
+class STATE(Enum):
+   JOINING = 1    # The node joins the chord network`
+   READY = 2   # The node ist ready for key lookups
 
 schema = {
     "action": {"type": "string"},
@@ -21,7 +27,7 @@ schema = {
 
 PORT_START = None
 SERVER_COUNT = None
-
+CURRENT_STATE = STATE.JOINING
 
 class DHTAsyncClient(asyncio.Protocol):
 
@@ -64,17 +70,16 @@ class DHTAsyncServer(asyncio.Protocol):
 
     @asyncio.coroutine
     def send_data(self, data):
+        print("Data to send is", data )
+        dataString = json.dumps(data);
 
-        print("  send data back..." + data)
-        server2 = self.__serverConnections.get("1338")
-
+        server2 = self.__serverConnections.get(str(data["destination_ip"]+":"+str(data["destination_port"])))
         if server2 is None or not server2.connected:
-            protocol, server2 = yield from loop.create_connection(lambda: DHTAsyncClient(data, loop), '127.0.0.1', 1338)
+            protocol, server2 = yield from loop.create_connection(lambda: DHTAsyncClient(json.dumps(data), loop), data["destination_ip"], data["destination_port"])
             server2.server_transport = self.transport
-            self.__serverConnections["1338"] = server2
-            print("Server2: ", data)
+            self.__serverConnections[str(data["destination_ip"]+":"+str(data["destination_port"]))] = server2
 
-        server2.transport.write(data.encode())
+        server2.transport.write(dataString.encode())
         # server2.transport.close()
 
     def connection_made(self, transport):
@@ -86,48 +91,88 @@ class DHTAsyncServer(asyncio.Protocol):
     def data_received(self, data):
         # Warning: do not call data.decode() twice
         # print("DATA IS" + data.decode())
-        print("Start data_received.")
+
         try:
-            print("Raw data: " + str(data))
+            #print("Raw data: " + str(data))
             msg = json.loads(data.decode())
-            print(msg)
         except Exception as e:
             print("JSON problem: " + str(e))
+
+        print("ACTION:", msg["action"])
+
         if msg["action"] == "client_start":
-            print("GOT DHT client_start COMMAND")
 
             # Firs twe JOIN the Chord network. Therefore we initialize the
             # finger Table with start values
 
             # is it a botstrap node?
 
+            if self.bootstrap_address is not None: # TODO: Change bootstrap port to address
+                # Make a find successor request
+                message = {
+                    "action": "FIND_SUCCESSOR",
+                    "key": self.get_keytemp(self.host_address, self.bootstrap_address), # TODO: Change port to address
+                    #"source_identity": self.get_key(),
+                    "destination_port": self.host_port,
+                    "destination_ip" : self.host_address,
+                    "source_port": self.host_port,
+                    "source_ip" : self.host_address,
+                    "ttl" : 4 # limit number of requests for debugging reasons!
+                }
+                asyncio.Task(self.send_data(message))
+
             self.node.initFingerTable()
+        elif msg["action"] == "FIND_SUCCESSOR_REPLY":
 
-
-            message = json.dumps({
-                "action": "FIND_SUCCESSOR",
-                "key": self.get_keytemp("127.0.0.1", 1338),
-                #"source_identity": self.get_key(),
-                "source_port": self.host_port,
-                "source_ip" : self.host_address
-            })
-            asyncio.Task(self.send_data(message))
+            # Update Successor
+            self.node.successor = Node(msg["nodeId"], msg["host_port"], msg["host_address"])
 
         elif msg["action"] == "FIND_SUCCESSOR":
-            print("got find successor request")
-            if msg["key"] == self.get_key():
-                # We are the target
-                print("Sending reply to origin")
+
+
+            # Case 1: We are the target (looked up id is between self.nodeId and self.successor.nodeId)
+            if int(msg["key"]) > self.get_key() and int(msg["key"]) <= self.node.successor.nodeId:
+
+                message = json.dumps({
+                    "action": "FIND_SUCCESSOR_REPLY",
+                    "key": self.get_keytemp(msg["source_ip"], msg["source_port"]), # TODO: Change port to address
+                    #"source_identity": self.get_key(),
+                    "destination_port": msg["source_port"],
+                    "destination_ip" : msg["source_ip"],
+                    "source_port": self.host_port,
+                    "source_ip" : self.host_address,
+
+                    "nodeId" : self.node.successor.nodeId,
+                    "host_port" : self.node.successor.host_port,
+                    "host_address" : self.node.successor.host_address
+
+                })
+                asyncio.Task(self.send_data(message))
+
+
             else:
+                # Case 2: We are not the target ----> Forward message to closest preceding finger
+                precedingNode = self.node.getClosestPrecedingFinger(msg["key"])
+                print("Forwarding find successor...");
+
                 # Forward message to next peer
                 new_msg = copy.deepcopy(msg)
+                new_msg["destination_ip"] = precedingNode.host_address
+                new_msg["destination_port"] = precedingNode.host_port
+                new_msg["ttl"] = msg["ttl"] - 1;
+
                 # TODO: add trace
-                asyncio.Task(self.send_data(new_msg))
+                if msg["ttl"] > 0:
+                    asyncio.Task(self.send_data(new_msg))
 
         self.transport.write(json.dumps({
             "STATUS": "OK"
         }).encode())  # send back
         self.transport.close()
+
+    def find_predecessor(self):
+        # TODO: set successor
+        pass
 
     def get_next_server(self):
         ip_address = "localhost"
@@ -150,25 +195,26 @@ def initialize(loop, port):
 
     boostrapNodePort = 1339 if port!=1339 else None
     dhtServer = yield from loop.create_server(lambda: DHTAsyncServer('127.0.0.1', port, bootstrap_address=boostrapNodePort), '127.0.0.1', port)
-    if port == 1339:
-        # make a local client
-        threading.Thread(target=connectClient).start()
+    print("CALLED INIT")
+    # make a local client
+    threading.Thread(target=connectClient).start()
 
 def connectClient():
     print("1")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_address = ('127.0.0.1', 1339)
+    print("port is ",port)
+    server_address = ('127.0.0.1', port)
     sock.connect(server_address)
     print("2")
     try:
 
-        message = json.dumps({
+        message = {
             "action": "client_start",
             # "action": "FIND_SUCCESSOR",
-        })
+        }
 
         # validate(message, schema)
-        sock.sendall(bytes(message, 'UTF-8'))
+        sock.sendall(bytes(json.dumps(message), 'UTF-8'))
 
         amount_received = 0
         amount_expected = len(message)
@@ -177,7 +223,7 @@ def connectClient():
             data = sock.recv(16)
             amount_received += len(data)
 
-        print("client server got" + str(data))
+        print("RESPONSE FROM client_start: " + str(data))
 
     finally:
         sock.close()

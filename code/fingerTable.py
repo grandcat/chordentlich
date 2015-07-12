@@ -23,11 +23,16 @@ class Node():
         self.host_port = host_port
         self.bootstrap_address = bootstrap_address
         self.entries = []
+        self.successor = self # Successor is self at the beginning
+        self.preedecessor = None
 
     def getEntry(self, position):
         addition = 2**(position-1)
         entry = (self.nodeId + addition) % self.chordRingSize
         return entry
+
+    def printFingerTable():
+        print(self.entries)
 
     def initFingerTable(self):
         if self.bootstrap_address is None:
@@ -36,15 +41,13 @@ class Node():
                 self.entries.append(Finger((self.nodeId + 2**k) % (self.chordRingSize), entry))
                 # print(int((self.nodeId + 2**k) % (self.chordRingSize)))
 
-        print(self.entries)
+    def getClosestPrecedingFinger(self, searchKey):
+        for k in range(len(self.entries), 0, -1):
+            entry = self.entries[k]
+            if  searchKey > entry.startID:
+                return self.successor
 
-
-    def getClosestPrecedingFinder(self, searchKey):
-        for k in range(self.chordFingerTableSize, 0, -1):
-            if  searchKey > self.getEntry(k):
-                return self.getEntry(k+1)
-
-        return self.nodeId
+        return self
 
     @property
     def getNodeId(self):

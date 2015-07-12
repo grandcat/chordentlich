@@ -1,5 +1,5 @@
 #!/bin/bash
-count=3
+count=6
 port_start=1337
 
 killall python3
