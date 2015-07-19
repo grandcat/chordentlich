@@ -35,20 +35,21 @@ class DHTAsyncClient(asyncio.Protocol):
         self.loop4 = loop4
 
     def connection_made(self, transport):
-        print('  Connected ', transport.get_extra_info('peername'))
+        #print('  Connected ', transport.get_extra_info('peername'))
         self.transport = transport
         # transport.write(self.msg.encode())
 
     def data_received(self, data):
         # Send message to server
         msg = data.decode()
-        print('Server returned: ', msg)
+        #print('Server returned: ', msg)
         self.transport.write(data)
         self.transport.close()
 
     def connection_lost(self, exc):
         # self.loop4.stop()
-        print("Client  Connection Lost")
+        #print("Client  Connection Lost")
+        pass
 
 class DHTAsyncServer(asyncio.Protocol):
     """
@@ -66,7 +67,7 @@ class DHTAsyncServer(asyncio.Protocol):
 
     @asyncio.coroutine
     def send_data(self, data):
-        print("Data to send is", data )
+        #print("Data to send is", data )
         dataString = json.dumps(data);
 
         server2 = self.__serverConnections.get(str(data["destination_ip"]+":"+str(data["destination_port"])))
@@ -127,6 +128,7 @@ class DHTAsyncServer(asyncio.Protocol):
             # Case 1: We are the target (looked up id is between self.nodeId and self.successor.nodeId)
             if int(msg["key"]) > self.get_key() and int(msg["key"]) <= self.node.successor.nodeId:
 
+                print("    - FIND_SUCCESSOR SEND REPLY!!");
                 message = json.dumps({
                     "action": "FIND_SUCCESSOR_REPLY",
                     "key": self.get_keytemp(msg["source_ip"], msg["source_port"]), # TODO: Change port to address
@@ -147,7 +149,7 @@ class DHTAsyncServer(asyncio.Protocol):
             else:
                 # Case 2: We are not the target ----> Forward message to closest preceding finger
                 precedingNode = self.node.getClosestPrecedingFinger(msg["key"])
-                print("Forwarding find successor...");
+                print("    - FIND_SUCCESSOR - FORWARD");
 
                 # Forward message to next peer
                 new_msg = copy.deepcopy(msg)
@@ -217,7 +219,7 @@ def connectClient():
             data = sock.recv(16)
             amount_received += len(data)
 
-        print("RESPONSE FROM client_start: " + str(data))
+        #print("RESPONSE FROM client_start: " + str(data))
 
     finally:
         sock.close()
