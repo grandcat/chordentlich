@@ -4,7 +4,6 @@ import copy
 import threading
 import time
 import socket
-import helpers
 import asyncio
 import hashlib
 from multiprocessing import Process
@@ -63,10 +62,7 @@ class DHTAsyncServer(asyncio.Protocol):
         self.bootstrap_address = bootstrap_address
         self.node = Node(self.get_key(), host_address, host_port, bootstrap_address)
         # Server state
-        self.__serverConnections = {}  # remember active connections
-
-        print("Address/Port of Bootstrap Node: ", bootstrap_address)
-        print("My key: ", self.get_key())
+        self.__serverConnections = {}  # remember active
 
     @asyncio.coroutine
     def send_data(self, data):
@@ -102,10 +98,8 @@ class DHTAsyncServer(asyncio.Protocol):
 
         if msg["action"] == "client_start":
 
-            # Firs twe JOIN the Chord network. Therefore we initialize the
+            # First we JOIN the Chord network. Therefore we initialize the
             # finger Table with start values
-
-            # is it a botstrap node?
 
             if self.bootstrap_address is not None: # TODO: Change bootstrap port to address
                 # Make a find successor request
@@ -194,18 +188,18 @@ def initialize(loop, port):
     # TODO: improve passing of parameters
 
     boostrapNodePort = 1339 if port!=1339 else None
+
+    print("Address/Port of Bootstrap Node: ", boostrapNodePort)
+    #print("My key: ", self.get_key())
+
     dhtServer = yield from loop.create_server(lambda: DHTAsyncServer('127.0.0.1', port, bootstrap_address=boostrapNodePort), '127.0.0.1', port)
-    print("CALLED INIT")
     # make a local client
     threading.Thread(target=connectClient).start()
 
 def connectClient():
-    print("1")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    print("port is ",port)
     server_address = ('127.0.0.1', port)
     sock.connect(server_address)
-    print("2")
     try:
 
         message = {
