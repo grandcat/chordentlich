@@ -24,14 +24,14 @@ class Node():
         self.bootstrap_address = bootstrap_address
         self.entries = []
         self.successor = self # Successor is self at the beginning
-        self.preedecessor = None
+        self.predecessor = None
 
     def getEntry(self, position):
         addition = 2**(position-1)
         entry = (self.nodeId + addition) % self.chordRingSize
         return entry
 
-    def printFingerTable():
+    def printFingerTable(self):
         print(self.entries)
 
     def initFingerTable(self):

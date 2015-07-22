@@ -101,6 +101,7 @@ class DHTAsyncServer(asyncio.Protocol):
 
             # First we JOIN the Chord network. Therefore we initialize the
             # finger Table with start values
+            print('Received client_start')
 
             if self.bootstrap_address is not None: # TODO: Change bootstrap port to address
                 # Make a find successor request
@@ -117,14 +118,13 @@ class DHTAsyncServer(asyncio.Protocol):
                 asyncio.Task(self.send_data(message))
 
             self.node.initFingerTable()
+
         elif msg["action"] == "FIND_SUCCESSOR_REPLY":
 
             # Update Successor
             self.node.successor = Node(msg["nodeId"], msg["host_port"], msg["host_address"])
 
         elif msg["action"] == "FIND_SUCCESSOR":
-
-
             # Case 1: We are the target (looked up id is between self.nodeId and self.successor.nodeId)
             if int(msg["key"]) > self.get_key() and int(msg["key"]) <= self.node.successor.nodeId:
 
@@ -150,11 +150,14 @@ class DHTAsyncServer(asyncio.Protocol):
                 # Case 2: We are not the target ----> Forward message to closest preceding finger
                 precedingNode = self.node.getClosestPrecedingFinger(msg["key"])
                 print("    - FIND_SUCCESSOR - FORWARD")
+                print("    - with destination: ", precedingNode.host_port)
 
                 # Forward message to next peer
+                # NOTE: host_address + host_port contain ourself right now. Therefore, just pass the message
+                # to our preceding neighbor. Therefore, "-1" is applied to precedingNode.host_port
                 new_msg = copy.deepcopy(msg)
                 new_msg["destination_ip"] = precedingNode.host_address
-                new_msg["destination_port"] = precedingNode.host_port
+                new_msg["destination_port"] = precedingNode.host_port - 1 # TODO: remove -1 once fingertable is fixed
                 new_msg["ttl"] = msg["ttl"] - 1
 
                 # TODO: add trace
@@ -189,14 +192,16 @@ class DHTAsyncServer(asyncio.Protocol):
 def initialize(loop, port):
     # TODO: improve passing of parameters
 
-    boostrapNodePort = 1339 if port!=1339 else None
+    # Last port is bootstrap node
+    boostrapNodePort = (PORT_START + SERVER_COUNT - 1) if port != (PORT_START + SERVER_COUNT - 1) else None
 
     print("Address/Port of Bootstrap Node: ", boostrapNodePort)
     #print("My key: ", self.get_key())
 
     dhtServer = yield from loop.create_server(lambda: DHTAsyncServer('127.0.0.1', port, bootstrap_address=boostrapNodePort), '127.0.0.1', port)
-    # make a local client
-    threading.Thread(target=connectClient).start()
+    # Spawn one unique local client on server n-1 responsible for all active DHT servers
+    if port == (PORT_START + SERVER_COUNT - 2):
+        threading.Thread(target=connectClient).start()
 
 def connectClient():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
