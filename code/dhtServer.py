@@ -30,9 +30,10 @@ CURRENT_STATE = STATE.JOINING
 
 class DHTAsyncClient(asyncio.Protocol):
 
-    def __init__(self, msg, loop4):
-        self.msg = msg
+    def __init__(self, msg, loop4, server_transport):
+        self.msg = msg  # Not used!
         self.loop4 = loop4
+        self.server_transport = server_transport
 
     def connection_made(self, transport):
         #print('  Connected ', transport.get_extra_info('peername'))
@@ -42,8 +43,17 @@ class DHTAsyncClient(asyncio.Protocol):
     def data_received(self, data):
         # Send message to server
         msg = data.decode()
-        #print('Server returned: ', msg)
-        self.transport.write(data)
+        print('[Client] Server returned: ', msg)
+        # self.transport.write(data)    # BUG: what's it for? Makes no difference
+        # Test: makes our server replying to the asking peer
+        new_json_data = {}
+        json_data = json.loads(msg)
+        new_json_data["old"] = json_data
+        new_json_data["INCLIENT"] = "OK"
+        self.server_transport.write(json.dumps(new_json_data).encode())
+        self.server_transport.close()
+        # Test END
+
         self.transport.close()
 
     def connection_lost(self, exc):
@@ -72,12 +82,13 @@ class DHTAsyncServer(asyncio.Protocol):
 
         server2 = self.__serverConnections.get(str(data["destination_ip"]+":"+str(data["destination_port"])))
         if server2 is None or not server2.connected:
-            protocol, server2 = yield from loop.create_connection(lambda: DHTAsyncClient(json.dumps(data), loop), data["destination_ip"], data["destination_port"])
+            protocol, server2 = yield from loop.create_connection(lambda: DHTAsyncClient(json.dumps(data), loop, self.transport), data["destination_ip"], data["destination_port"])
             server2.server_transport = self.transport
             self.__serverConnections[str(data["destination_ip"]+":"+str(data["destination_port"]))] = server2
 
         server2.transport.write(dataString.encode())
         # server2.transport.close()
+        return 0
 
     def connection_made(self, transport):
 
@@ -113,9 +124,11 @@ class DHTAsyncServer(asyncio.Protocol):
                     "destination_ip" : self.host_address,
                     "source_port": self.host_port,
                     "source_ip" : self.host_address,
-                    "ttl" : 4 # limit number of requests for debugging reasons!
+                    "ttl" : 3 # limit number of requests for debugging reasons!
                 }
-                asyncio.Task(self.send_data(message))
+                result = asyncio.Task(self.send_data(message), loop=loop)
+                # result.add_done_callback(self.handle_result)
+                print("client_start: async send_data ", result)
 
             self.node.initFingerTable()
 
@@ -163,11 +176,19 @@ class DHTAsyncServer(asyncio.Protocol):
                 # TODO: add trace
                 if msg["ttl"] > 0:
                     asyncio.Task(self.send_data(new_msg))
+                else:
+                    print("Abort FIND_SUCCESSOR - FORWARD: ttl exceeded.")
+                    self.transport.write(json.dumps({
+                        "STATUS": "ENDOFLINE",
+                        "HOST_PORT": port   # TODO: remove, for debugging
+                    }).encode())  # send back
+                    self.transport.close()
 
-        self.transport.write(json.dumps({
-            "STATUS": "OK"
-        }).encode())  # send back
-        self.transport.close()
+        # self.transport.write(json.dumps({
+        #     "STATUS": "OK",
+        #     "HOST_PORT": port   # TODO: remove, for debugging
+        # }).encode())  # send back
+        # self.transport.close()
 
     def find_predecessor(self):
         # TODO: set successor
@@ -218,13 +239,16 @@ def connectClient():
         sock.sendall(bytes(json.dumps(message), 'UTF-8'))
 
         amount_received = 0
-        amount_expected = len(message)
+        data_available = 1
 
-        while amount_received < amount_expected:
+        output = bytearray()
+        while data_available > 0 and amount_received < 1024:
             data = sock.recv(16)
+            data_available = len(data)
             amount_received += len(data)
+            output.extend(data)
 
-        #print("RESPONSE FROM client_start: " + str(data))
+        print("RESPONSE FROM client_start: " + output.decode())
 
     finally:
         sock.close()
