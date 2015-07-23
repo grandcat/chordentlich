@@ -49,7 +49,7 @@ class DHTAsyncClient(asyncio.Protocol):
         new_json_data = {}
         json_data = json.loads(msg)
         new_json_data["old"] = json_data
-        new_json_data["INCLIENT"] = "OK"
+        new_json_data["port"] = port
         self.server_transport.write(json.dumps(new_json_data).encode())
         self.server_transport.close()
         # Test END
