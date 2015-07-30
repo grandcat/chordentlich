@@ -68,10 +68,10 @@ class DHTAsyncServer(asyncio.Protocol):
     Independent DHT node acting as a server or even bootstrap node.
     """
 
-    def __init__(self, host_address, host_port, bootstrap_address=None):
-        # This node
-        self.node = Node(host_address, host_port, bootstrap_address=bootstrap_address)
+    def __init__(self, this_node):
         self.log = logging.getLogger(__name__)
+        # This node
+        self.node = this_node
         # Server/Client states
         self.__serverConnections = {}  # remember active connections to other DHT servers
 
@@ -113,7 +113,8 @@ class DHTAsyncServer(asyncio.Protocol):
             # finger Table with start values
             self.log.info("Client request: start initializing.")
 
-            self.node.initFingerTable()
+            self.node.init_finger_table()
+            print("Closest preceding: ", self.node.get_closest_preceding_finger(0))
 
         elif msg["action"] == "client_test_msg_forward":
             # First we JOIN the Chord network. Therefore we initialize the
@@ -121,6 +122,7 @@ class DHTAsyncServer(asyncio.Protocol):
             print('Received client_test_msg_forward')
 
             if self.node.bootstrap_address is not None:
+                print("Closest preceding: ", self.node.get_closest_preceding_finger(32))
                 # Make a find successor request
                 message = {
                     "action": "FIND_SUCCESSOR",
@@ -135,8 +137,6 @@ class DHTAsyncServer(asyncio.Protocol):
                 result = asyncio.Task(self.send_data(message), loop=loop)
                 # result.add_done_callback(self.handle_result)
                 print("client_test_msg_forward: async send_data ", result)
-
-            self.node.initFingerTable()
 
         elif msg["action"] == "FIND_SUCCESSOR_REPLY":
 
@@ -167,7 +167,7 @@ class DHTAsyncServer(asyncio.Protocol):
 
             else:
                 # Case 2: We are not the target ----> Forward message to closest preceding finger
-                precedingNode = self.node.getClosestPrecedingFinger(msg["key"])
+                precedingNode = self.node.get_closest_preceding_finger(int(msg["key"]))
                 print("    - FIND_SUCCESSOR - FORWARD")
                 print("    - with destination: ", precedingNode.host_port)
 
@@ -225,7 +225,9 @@ def initialize(loop, port):
     print("Address/Port of Bootstrap Node: ", boostrapNodePort)
     #print("My key: ", self.get_key())
 
-    dhtServer = yield from loop.create_server(lambda: DHTAsyncServer('127.0.0.1', port, bootstrap_address=boostrapNodePort), '127.0.0.1', port)
+    # Instantiate this node here because DHTAsyncServer is recreated each time a new connection is made
+    thisNode = Node('127.0.0.1', port, bootstrap_address=boostrapNodePort)
+    dhtServer = yield from loop.create_server(lambda: DHTAsyncServer(thisNode), '127.0.0.1', port)
     # Spawn one unique local client on server n-1 responsible for all active DHT servers
     if port == (PORT_START + SERVER_COUNT - 1):
         threading.Thread(target=connectClient).start()
@@ -264,7 +266,6 @@ Main application
 """
 # Setup logging
 logging.basicConfig(format='[%(levelname)s:%(threadName)s:%(name)s:%(funcName)s] %(message)s', level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Parse console arguments
 opts, args = getopt.getopt(sys.argv[1:], "p:s:c:")
