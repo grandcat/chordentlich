@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import hashlib
+import logging
 
 CHORD_FINGER_TABLE_SIZE = 8 # TODO: 256
 CHORD_RING_SIZE = 2**CHORD_FINGER_TABLE_SIZE  # Maximum number of addresses in the Chord network
@@ -16,17 +17,21 @@ class Finger:
 class Node():
 
     def __init__(self, host_address, host_port, nodeId=None, bootstrap_address=None):
+        self.log = logging.getLogger(__name__)
+        # Node structure
         self.id = nodeId or self.generate_key(host_address, host_port)
         self.host_address = host_address
         self.host_port = host_port
         self.bootstrap_address = bootstrap_address
-        self.entries = []
-        self.successor = self # Successor is self at the beginning
+        self.fingertable = []
+        self.successor = self   # Todo: fix dependencies (should be set to None here)
         self.predecessor = None
+
+        self.log.info("nodeID: %d, port: %d", self.id, self.host_port)
 
     @staticmethod
     def generate_key(host_address, host_port):
-        # TODO: public key hash
+        # TODO: public key hash instead of IP address + port
         # TODO: remove modulo
         return int(hashlib.sha256((host_address + str(host_port)).encode()).hexdigest(), 16) % CHORD_RING_SIZE
 
@@ -36,20 +41,29 @@ class Node():
         return entry
 
     def printFingerTable(self):
-        print(self.entries)
+        print(self.fingertable)
 
     def initFingerTable(self):
+        # if self.bootstrap_address is None:
+        for k in range(0, CHORD_FINGER_TABLE_SIZE):
+            # entry = self
+            # self.fingertable.append(Finger((self.id + 2**k) % (CHORD_RING_SIZE), entry))
+            entry = {
+                "start": ((self.id + 2**k) % CHORD_RING_SIZE),
+                "successor_node": None
+            }
+            # TODO: add successor if not bootstrap node
+            self.fingertable.append(entry)
+
+        self.log.info("Fingertable: %s", self.fingertable)
         if self.bootstrap_address is None:
-            for k in range(1, CHORD_FINGER_TABLE_SIZE):
-                entry = self
-                self.entries.append(Finger((self.id + 2**k) % (CHORD_RING_SIZE), entry))
-                self.entries.append({'start': ((self.id + 2**k) % CHORD_RING_SIZE)})
-                # print(int((self.nodeId + 2**k) % (self.chordRingSize)))
+            # We are the bootstrap node or start a new Chord network
+            self.successor = self.predecessor = self
 
     def getClosestPrecedingFinger(self, searchKey):
-        for k in range(len(self.entries), 0, -1):
-            entry = self.entries[k]
-            if  searchKey > entry.startID:
+        for k in range(len(self.fingertable), 0, -1):
+            entry = self.fingertable[k]
+            if  searchKey > entry["start"]:
                 return self.successor
 
         return self

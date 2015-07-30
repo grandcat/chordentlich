@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import copy
+import logging
 import threading
 import time
 import socket
@@ -70,6 +71,7 @@ class DHTAsyncServer(asyncio.Protocol):
     def __init__(self, host_address, host_port, bootstrap_address=None):
         # This node
         self.node = Node(host_address, host_port, bootstrap_address=bootstrap_address)
+        self.log = logging.getLogger(__name__)
         # Server/Client states
         self.__serverConnections = {}  # remember active connections to other DHT servers
 
@@ -104,15 +106,21 @@ class DHTAsyncServer(asyncio.Protocol):
         except Exception as e:
             print("JSON problem: " + str(e))
 
-        print("ACTION:", msg["action"])
+        self.log.info("ACTION: %s", msg["action"])
 
         if msg["action"] == "init_node":
-
             # First we JOIN the Chord network. Therefore we initialize the
             # finger Table with start values
-            print('Received init_node')
+            self.log.info("Client request: start initializing.")
 
-            if self.node.bootstrap_address is not None: # TODO: Change bootstrap port to address
+            self.node.initFingerTable()
+
+        elif msg["action"] == "client_test_msg_forward":
+            # First we JOIN the Chord network. Therefore we initialize the
+            # finger Table with start values
+            print('Received client_test_msg_forward')
+
+            if self.node.bootstrap_address is not None:
                 # Make a find successor request
                 message = {
                     "action": "FIND_SUCCESSOR",
@@ -126,7 +134,7 @@ class DHTAsyncServer(asyncio.Protocol):
                 }
                 result = asyncio.Task(self.send_data(message), loop=loop)
                 # result.add_done_callback(self.handle_result)
-                print("init_node: async send_data ", result)
+                print("client_test_msg_forward: async send_data ", result)
 
             self.node.initFingerTable()
 
@@ -211,15 +219,15 @@ class DHTAsyncServer(asyncio.Protocol):
 def initialize(loop, port):
     # TODO: improve passing of parameters
 
-    # Last port is bootstrap node
-    boostrapNodePort = (PORT_START + SERVER_COUNT - 1) if port != (PORT_START + SERVER_COUNT - 1) else None
+    # First port is bootstrap node
+    boostrapNodePort = PORT_START if port != PORT_START else None
 
     print("Address/Port of Bootstrap Node: ", boostrapNodePort)
     #print("My key: ", self.get_key())
 
     dhtServer = yield from loop.create_server(lambda: DHTAsyncServer('127.0.0.1', port, bootstrap_address=boostrapNodePort), '127.0.0.1', port)
     # Spawn one unique local client on server n-1 responsible for all active DHT servers
-    if port == (PORT_START + SERVER_COUNT - 2):
+    if port == (PORT_START + SERVER_COUNT - 1):
         threading.Thread(target=connectClient).start()
 
 def connectClient():
@@ -229,7 +237,7 @@ def connectClient():
     try:
 
         message = {
-            "action": "init_node",
+            "action": "client_test_msg_forward",
             # "action": "FIND_SUCCESSOR",
         }
 
@@ -246,7 +254,7 @@ def connectClient():
             amount_received += len(data)
             output.extend(data)
 
-        print("RESPONSE FROM init_node: " + output.decode())
+        print("RESPONSE FROM client_test_msg_forward: " + output.decode())
 
     finally:
         sock.close()
@@ -254,6 +262,10 @@ def connectClient():
 """
 Main application
 """
+# Setup logging
+logging.basicConfig(format='[%(levelname)s:%(threadName)s:%(name)s:%(funcName)s] %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Parse console arguments
 opts, args = getopt.getopt(sys.argv[1:], "p:s:c:")
 port = None
