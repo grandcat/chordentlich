@@ -35,16 +35,18 @@ class Finger(object):
 
 class Node(object):
 
-    def __init__(self, host_address, host_port, node_id=None, bootstrap_address=None):
+    def __init__(self, host_address, host_port, node_id=None, bootstrap_port=None, predecessor=None):
         self.log = logging.getLogger(__name__)
         # Node structure
         self.id = node_id or self.generate_key(host_address, host_port)
         self.host_address = host_address
         self.host_port = host_port
-        self.bootstrap_address = bootstrap_address
+        self.bootstrap_port = bootstrap_port
         self.fingertable = []
         self.successor = self   # Todo: fix dependencies (should be set to None here and initialized properly)
-        self.predecessor = None
+
+        if predecessor == None:
+            self.predecessor = self
 
         self.log.info("nodeID: %d, port: %d", self.id, self.host_port)
         # Create first version of finger table to prevent crash during message forward when debugging
@@ -82,8 +84,8 @@ class Node(object):
             # TODO: add successor if not bootstrap node
             self.fingertable.append(entry)
 
-        self.log.info("Fingertable: %s", self.fingertable)
-        if self.bootstrap_address is None:
+        self.log.info("Fingertable: %s", str(self.fingertable)+"\n\n")
+        if self.bootstrap_port is None:
             # We are the bootstrap node or start a new Chord network
             self.successor = self.predecessor = self
 

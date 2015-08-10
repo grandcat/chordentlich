@@ -79,9 +79,11 @@ class DHTAsyncServer(asyncio.Protocol):
     def send_data(self, data):
         #print("Data to send is", data )
         dataString = json.dumps(data)
+        print(data)
 
         server2 = self.__serverConnections.get(str(data["destination_ip"]+":"+str(data["destination_port"])))
         if server2 is None or not server2.connected:
+
             protocol, server2 = yield from loop.create_connection(lambda: DHTAsyncClient(json.dumps(data), loop, self.transport), data["destination_ip"], data["destination_port"])
             server2.server_transport = self.transport
             self.__serverConnections[str(data["destination_ip"]+":"+str(data["destination_port"]))] = server2
@@ -91,8 +93,6 @@ class DHTAsyncServer(asyncio.Protocol):
         return 0
 
     def connection_made(self, transport):
-
-        print("new connection")
         peer = transport.get_extra_info('peername')
         self.transport = transport
 
@@ -112,42 +112,67 @@ class DHTAsyncServer(asyncio.Protocol):
             # First we JOIN the Chord network. Therefore we initialize the
             # finger Table with start values
             self.log.info("Client request: start initializing.")
+            # First we need to send a find successor to the bootstrap node
+            message = {
+                "action": "FIND_SUCCESSOR",
+                "key": self.get_keytemp(self.node.host_address, self.node.host_port),
+                "newpredecessor": self.get_key(), # The predecessor must be updated in the initial bootstrap find_successor
+                "destination_port": self.node.bootstrap_port,
+                "destination_ip" : "127.0.0.1",
+                "source_port": self.node.host_port,
+                "source_ip" : self.node.host_address,
+                "ttl" : 3 # limit number of requests for debugging reasons!
+            }
+            result = asyncio.Task(self.send_data(message), loop=loop)
 
-            self.node.init_finger_table()
-            print("Closest preceding: ", self.node.get_closest_preceding_finger(0))
+            #print("Closest preceding: ", self.node.get_closest_preceding_finger(0))
 
         elif msg["action"] == "client_test_msg_forward":
             # First we JOIN the Chord network. Therefore we initialize the
             # finger Table with start values
             print('Received client_test_msg_forward')
 
-            if self.node.bootstrap_address is not None:
-                print("Closest preceding: ", self.node.get_closest_preceding_finger(32))
-                # Make a find successor request
-                message = {
-                    "action": "FIND_SUCCESSOR",
-                    "key": self.get_keytemp(self.node.host_address, self.node.host_port), # TODO: Change port to address
-                    #"source_identity": self.get_key(),
-                    "destination_port": self.node.host_port,
-                    "destination_ip" : self.node.host_address,
-                    "source_port": self.node.host_port,
-                    "source_ip" : self.node.host_address,
-                    "ttl" : 3 # limit number of requests for debugging reasons!
-                }
-                result = asyncio.Task(self.send_data(message), loop=loop)
-                # result.add_done_callback(self.handle_result)
-                print("client_test_msg_forward: async send_data ", result)
+            if False: # removed temporary for debugging
+
+                if self.node.bootstrap_port is not None:
+                    print("Closest preceding: ", self.node.get_closest_preceding_finger(32))
+                    # Make a find successor request
+                    message = {
+                        "action": "FIND_SUCCESSOR",
+                        "key": self.get_keytemp(self.node.host_address, self.node.host_port), # TODO: Change port to address
+                        #"source_identity": self.get_key(),
+                        "destination_port": self.node.host_port,
+                        "destination_ip" : self.node.host_address,
+                        "source_port": self.node.host_port,
+                        "source_ip" : self.node.host_address,
+                        "ttl" : 3 # limit number of requests for debugging reasons!
+                    }
+                    result = asyncio.Task(self.send_data(message), loop=loop)
+                    # result.add_done_callback(self.handle_result)
+                    print("client_test_msg_forward: async send_data ", result)
+
 
         elif msg["action"] == "FIND_SUCCESSOR_REPLY":
+            # If our node is in state JOINING, we continue with the init_finger_table procedure
+            # as the successor in now available
+            if CURRENT_STATE == STATE.JOINING:
 
-            # Update Successor
-            self.node.successor = Node(msg["nodeId"], msg["host_port"], msg["host_address"])
+                # now we have the predecessor of the successor, so we can init the finger table
+                self.node.init_finger_table()
+                CURRENT_STATE = STATE.READY
+            else:
+                # Update Successor
+                self.node.successor = Node(msg["nodeId"], msg["host_port"], msg["host_address"])
 
         elif msg["action"] == "FIND_SUCCESSOR":
             # Case 1: We are the target (looked up id is between self.nodeId and self.successor.nodeId)
             if int(msg["key"]) > self.get_key() and int(msg["key"]) <= self.node.successor.id:
 
                 print("    - FIND_SUCCESSOR SEND REPLY!!")
+                if msg["newpredecessor"] != None: # update our current node predeccessor if someone has joined before us in the chord ring
+                    self.predecessor = Node(msg["source_ip"], msg["source_port"], node_id=msg["newpredecessor"], bootstrap_port=None, predecessor=None)
+                    print("    - FIND_SUCCESSOR UPDATED PREDECESSOR")
+
                 message = json.dumps({
                     "action": "FIND_SUCCESSOR_REPLY",
                     "key": self.get_keytemp(msg["source_ip"], msg["source_port"]), # TODO: Change port to address
@@ -156,7 +181,7 @@ class DHTAsyncServer(asyncio.Protocol):
                     "destination_ip" : msg["source_ip"],
                     "source_port": self.node.host_port,
                     "source_ip" : self.node.host_address,
-
+                    "predecessor" : self.node.predecessor, # We have to return the predecessor for the boot, as it is needed in init_finger_table
                     "nodeId" : self.node.successor.id,
                     "host_port" : self.node.successor.host_port,
                     "host_address" : self.node.successor.host_address
@@ -176,7 +201,7 @@ class DHTAsyncServer(asyncio.Protocol):
                 # to our preceding neighbor. Therefore, "-1" is applied to precedingNode.host_port
                 new_msg = copy.deepcopy(msg)
                 new_msg["destination_ip"] = precedingNode.host_address
-                new_msg["destination_port"] = precedingNode.host_port - 1 # TODO: remove -1 once fingertable is fixed
+                new_msg["destination_port"] = precedingNode.host_port # - 1  TODO: remove -1 once fingertable is fixed
                 new_msg["ttl"] = msg["ttl"] - 1
 
                 # TODO: add trace
@@ -226,7 +251,7 @@ def initialize(loop, port):
     #print("My key: ", self.get_key())
 
     # Instantiate this node here because DHTAsyncServer is recreated each time a new connection is made
-    thisNode = Node('127.0.0.1', port, bootstrap_address=boostrapNodePort)
+    thisNode = Node('127.0.0.1', port, bootstrap_port=boostrapNodePort)
     dhtServer = yield from loop.create_server(lambda: DHTAsyncServer(thisNode), '127.0.0.1', port)
     # Spawn one unique local client on server n-1 responsible for all active DHT servers
     if port == (PORT_START + SERVER_COUNT - 1):
@@ -239,7 +264,7 @@ def connectClient():
     try:
 
         message = {
-            "action": "client_test_msg_forward",
+            "action": "init_node",
             # "action": "FIND_SUCCESSOR",
         }
 
@@ -256,7 +281,7 @@ def connectClient():
             amount_received += len(data)
             output.extend(data)
 
-        print("RESPONSE FROM client_test_msg_forward: " + output.decode())
+        #print("connectClient() returned: " + output.decode())
 
     finally:
         sock.close()
