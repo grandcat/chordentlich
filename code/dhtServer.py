@@ -19,6 +19,8 @@ from enum import Enum
 class STATE(Enum):
    JOINING = 1    # The node joins the chord network`
    READY = 2   # The node ist ready for key lookups
+   FIND_PREDECESSOR = 3
+   FIND_SUCCESSOR = 4
 
 schema = {
     "action": {"type": "string"},
