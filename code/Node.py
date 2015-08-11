@@ -53,14 +53,13 @@ class Node(aiomas.Agent):
 
     def __init__(self, container, node_address):
         # Async RPC init
-        if container:
-            super().__init__(container, node_address)
-            self.node_address = node_address
-            # Logging
-            self.log = logging.getLogger(__name__)
-            self.log.info("Node server listening on %s.", node_address)
-            # Node state
-            self.fingertable = []
+        super().__init__(container, node_address)
+        self.node_address = node_address
+        # Logging
+        self.log = logging.getLogger(__name__)
+        self.log.info("Node server listening on %s.", node_address)
+        # Node state
+        self.fingertable = []
 
     @asyncio.coroutine
     def setup_node(self, node_id=None, node_address=None, bootstrap_address=None, predecessor=None):
