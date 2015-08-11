@@ -72,7 +72,7 @@ class DHTAsyncServer(asyncio.Protocol):
 
     def __init__(self, this_node):
         self.log = logging.getLogger(__name__)
-        # This node
+        # This nodesend_data
         self.node = this_node
         # Server/Client states
         self.__serverConnections = {}  # remember active connections to other DHT servers
@@ -134,24 +134,23 @@ class DHTAsyncServer(asyncio.Protocol):
             # finger Table with start values
             print('Received client_test_msg_forward')
 
-            if False: # removed temporary for debugging
-
-                if self.node.bootstrap_port is not None:
-                    print("Closest preceding: ", self.node.get_closest_preceding_finger(32))
-                    # Make a find successor request
-                    message = {
-                        "action": "FIND_SUCCESSOR",
-                        "key": self.get_keytemp(self.node.host_address, self.node.host_port), # TODO: Change port to address
-                        #"source_identity": self.get_key(),
-                        "destination_port": self.node.host_port,
-                        "destination_ip" : self.node.host_address,
-                        "source_port": self.node.host_port,
-                        "source_ip" : self.node.host_address,
-                        "ttl" : 3 # limit number of requests for debugging reasons!
-                    }
-                    result = asyncio.Task(self.send_data(message), loop=loop)
-                    # result.add_done_callback(self.handle_result)
-                    print("client_test_msg_forward: async send_data ", result)
+            if self.node.bootstrap_port is not None:
+                print("Closest preceding: ", self.node.get_closest_preceding_finger(32))
+                # Make a find successor request
+                message = {
+                    "action": "FIND_SUCCESSOR",
+                    "key": self.get_keytemp(self.node.host_address, self.node.host_port), # TODO: Change port to address
+                    #"source_identity": self.get_key(),
+                    "destination_port": self.node.host_port,
+                    "destination_ip" : self.node.host_address,
+                    "source_port": self.node.host_port,
+                    "source_ip" : self.node.host_address,
+                    "ttl" : 3 # limit number of requests for debugging reasons!
+                }
+                result = asyncio.Task(self.send_data(message), loop=loop)
+                # asyncio.async(self.send_data(message), loop=loop)
+                # result.add_done_callback(self.handle_result)
+                print("client_test_msg_forward: async send_data ", result)
 
 
         elif msg["action"] == "FIND_SUCCESSOR_REPLY":
@@ -203,7 +202,7 @@ class DHTAsyncServer(asyncio.Protocol):
                 # to our preceding neighbor. Therefore, "-1" is applied to precedingNode.host_port
                 new_msg = copy.deepcopy(msg)
                 new_msg["destination_ip"] = precedingNode.host_address
-                new_msg["destination_port"] = precedingNode.host_port # - 1  TODO: remove -1 once fingertable is fixed
+                new_msg["destination_port"] = precedingNode.host_port - 1  # TODO: remove -1 once fingertable is fixed
                 new_msg["ttl"] = msg["ttl"] - 1
 
                 # TODO: add trace
@@ -266,7 +265,8 @@ def connectClient():
     try:
 
         message = {
-            "action": "init_node",
+            # "action": "init_node",
+            "action": "client_test_msg_forward",
             # "action": "FIND_SUCCESSOR",
         }
 
