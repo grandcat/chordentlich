@@ -40,13 +40,13 @@ def in_interval(search_id, node_left, node_right, inclusive_left=False, inclusiv
 #     return node
 
 
-class Finger(object):
-    def __init__(self, start_id, successor=None):
-        self.startID = start_id
-        self.successor = successor
-
-    def __repr__(self):
-        return 'Start: ' + str(self.startID) + ', SuccessorID: ' + str(self.successor.nodeId)
+# class Finger(object):
+#     def __init__(self, start_id, successor=None):
+#         self.startID = start_id
+#         self.successor = successor
+#
+#     def __repr__(self):
+#         return 'Start: ' + str(self.startID) + ', SuccessorID: ' + str(self.successor.nodeId)
 
 
 class Node(aiomas.Agent):
@@ -62,7 +62,7 @@ class Node(aiomas.Agent):
         self.fingertable = []
 
     @asyncio.coroutine
-    def setup_node(self, node_id=None, node_address=None, bootstrap_address=None, predecessor=None):
+    def setup_node(self, node_id=None, node_address=None, bootstrap_address=None):
         """
         Set ups all internal state variables needed for operation.
         Needs to be called previously to any other function or RPC call.
@@ -72,11 +72,7 @@ class Node(aiomas.Agent):
         self.bootstrap_address = bootstrap_address
         self.log.info("[Configuration]  node_id: %d, bootstrap_node: %s", self.id, self.bootstrap_address)
 
-        self.successor = self.as_dict()   # Todo: fix dependencies (should be set to None here and initialized properly)
-        if predecessor is None:
-            self.predecessor = self.as_dict()
-        else:
-            self.predecessor = predecessor
+        self.successor = self.predecessor = self.as_dict()   # Todo: fix dependencies (should be set to None here and initialized properly)
 
         # Create first version of finger table to prevent crash during message forward when debugging
         self.init_finger_table()
@@ -88,6 +84,7 @@ class Node(aiomas.Agent):
         }
         if serialize_neighbors and self.successor:
             dict_node["successor"] = self.successor
+        # Check: rarely needed, could be removed maybe
         if serialize_neighbors and self.predecessor:
             dict_node["predecessor"] = self.predecessor
 
@@ -113,26 +110,40 @@ class Node(aiomas.Agent):
     def get_node_id(self):
         return self.id
 
-    def print_finger_table(self):
-        print(self.fingertable)
-
     def init_finger_table(self):
-        # if self.bootstrap_address is None:
+        if self.bootstrap_address:
+            # Regular node joining via bootstrap node
+            self.__generate_fingers(None)
+            # Joining node
+            self.successor = self.predecessor = None
+
+        else:
+            # This is the bootstrap node
+            successor_node = self.as_dict()
+            self.__generate_fingers(successor_node)
+            self.successor = self.predecessor = successor_node
+
+        # Optimization for joining node (if not bootstrap node)
+        # - Find close node to myself (e.g., successor)
+        # - Request finger table and store temporary_entries
+        # - for each of my needed finger table starts, use closest entries and directly ask this node.
+        # - Fallback to node asked previously (or bootstrap node as last fallback) if node is not responding
+
+    def __generate_fingers(self, successor_reference):
         self.fingertable = []
+
         for k in range(0, CHORD_FINGER_TABLE_SIZE):
-            # entry = self
-            # self.fingertable.append(Finger((self.id + 2**k) % (CHORD_RING_SIZE), entry))
             entry = {
                 "start": ((self.id + 2**k) % CHORD_RING_SIZE),
-                "successor": self.as_dict()
+                "successor": successor_reference
             }
             # TODO: add successor if not bootstrap node
             self.fingertable.append(entry)
 
-        self.log.info("Fingertable: %s", str(self.fingertable)+"\n\n")
-        if self.bootstrap_address is None:
-            # We are the bootstrap node or start a new Chord network
-            self.successor = self.predecessor = self.as_dict()
+        self.log.info("Default finger table: %s", str(self.fingertable)+"\n\n")
+
+    def print_finger_table(self):
+        print(self.fingertable)
 
     def find_successor(self, node_id):
         node = self.find_predecessor(node_id)
@@ -142,36 +153,52 @@ class Node(aiomas.Agent):
     def find_predecessor(self, node_id):
         # Special case: id we are looking for is managed by our immediate successor
         if in_interval(node_id, self.id, self.successor["node_id"]):
-            return self
+            return self.as_dict(serialize_neighbors=True)
 
         selected_node = self.as_dict(serialize_neighbors=True)
         while not in_interval(node_id, selected_node["node_id"], selected_node["successor"]["node_id"], inclusive_right=True):
-            if selected_node.id == self.id:
-                selected_node = self.__get_closest_preceding_finger(node_id)  # deadlocking right now
-                # TODO: break if we are the one
+            if selected_node["node_id"] == self.id:
+                # Typically in first round: use our finger table to locate close peer
+                selected_node = self.get_closest_preceding_finger(node_id)
+                # If still our self, we do not know closer peer and should stop searching
+                if selected_node["node_id"] == self.id:
+                    break
+
             else:
-                # For all other nodes, we have to do a RPC here
-                self.log.warn("RPC not implemented here.")
-                break
+                # For all other remote peers, we have to do a RPC here
+                peer = yield from self.container.connect(selected_node["node_address"])
+                selected_node = yield from peer.rpc_get_closest_preceding_finger(selected_node["node_id"])
+                # TODO: validate received input before continuing the loop
+                self.log.info("Remote closest node: %s", str(selected_node))
 
         return selected_node
 
-    def __get_closest_preceding_finger(self, node_id):
-        # Find closest preceding finger from m -> 0
+    def get_closest_preceding_finger(self, node_id):
+        """
+        Find closest preceding finger within m -> 0 fingers.
+
+        :param node_id: Node ID as an integer.
+        :return: Returns the interesting node descriptor as a dictionary with successor and predecessor.
+        """
         for k in range(CHORD_FINGER_TABLE_SIZE - 1, -1, -1):
             finger_successor = self.fingertable[k]["successor"]
             self.log.debug("Iterate finger %d: %d in %s", k, node_id, self.fingertable[k])
 
             if in_interval(finger_successor["node_id"], self.id, node_id):
-                return finger_successor  # BUG: successor information missing, maybe need additional RPC here
+                return finger_successor
 
         return self.as_dict(serialize_neighbors=True)
 
     ### RPC wrappers ###
     @aiomas.expose
-    def get_closest_preceding_finger(self, node_id):
-        # TODO: prevent malicious contents
-        return self.__get_closest_preceding_finger(node_id)
+    def rpc_find_successor(self, node_id):
+        # TODO: validate params to prevent attacks!
+        return self.find_successor(node_id)
+
+    @aiomas.expose
+    def rpc_get_closest_preceding_finger(self, node_id):
+        # TODO: validate params to prevent attacks!
+        return self.get_closest_preceding_finger(node_id)
 
     ### RPC tests ###
     @asyncio.coroutine
@@ -185,8 +212,15 @@ class Node(aiomas.Agent):
     def test_get_closest_preceding_finger(self, addr, node_id):
         # RPC to remote node
         remote_agent = yield from self.container.connect(addr)
-        res_node = yield from remote_agent.get_closest_preceding_finger(node_id)
+        res_node = yield from remote_agent.rpc_get_closest_preceding_finger(node_id)
         print("%s got answer from %s: closest node is %s" % (self.node_address, addr, str(res_node)))
+
+    @asyncio.coroutine
+    def test_find_my_successor(self, addr):
+        # RPC to remote node
+        remote_agent = yield from self.container.connect(addr)
+        res_node = yield from remote_agent.rpc_get_closest_preceding_finger(self.id + 1)
+        print("%s got answer from %s: my successor is %s" % (self.node_address, addr, str(res_node)))
 
 
 """
@@ -211,7 +245,7 @@ for key, val in opts:
 print("Port", port)
 # Testing: First port is bootstrap node
 bootstrap_addr = ("tcp://localhost:" + str(port_start) + "/0") if port != port_start else None
-print("Address/Port of Bootstrap Node: ", bootstrap_addr)
+print("Address/Port of Bootstrap Node: ", (bootstrap_addr or "this node"))
 print("-------------------")
 
 # Define multiple agents per node for accepting RPCs
@@ -220,14 +254,15 @@ nodes = [c.spawn(Node) for i in range(2)]
 # Start async server
 loop = asyncio.get_event_loop()
 loop.run_until_complete(nodes[0].setup_node(bootstrap_address=bootstrap_addr))
-loop.run_until_complete(nodes[1].setup_node(bootstrap_address=bootstrap_addr))
-# Test RPC calls within the same node
+#loop.run_until_complete(nodes[1].setup_node(bootstrap_address=bootstrap_addr))
+# Test RPC calls within the same node from backup agent 1 to agent 0
 loop.run_until_complete(nodes[1].test_get_node_id(nodes[0].addr))
 
 # Test RPC calls to bootstrap node (first port)
 if bootstrap_addr is not None:
-    loop.run_until_complete(nodes[1].test_get_node_id(bootstrap_addr))
-    loop.run_until_complete(nodes[1].test_get_closest_preceding_finger(bootstrap_addr, 123))
+    loop.run_until_complete(nodes[0].test_get_node_id(bootstrap_addr))
+    loop.run_until_complete(nodes[0].test_get_closest_preceding_finger(bootstrap_addr, 123))
+    loop.run_until_complete(nodes[0].test_find_my_successor(bootstrap_addr))
 
 loop.run_forever()
 c.shutdown()

@@ -127,7 +127,7 @@ class DHTAsyncServer(asyncio.Protocol):
             }
             result = asyncio.Task(self.send_data(message), loop=loop)
 
-            #print("Closest preceding: ", self.node.__get_closest_preceding_finger(0))
+            #print("Closest preceding: ", self.node.get_closest_preceding_finger(0))
 
         elif msg["action"] == "client_test_msg_forward":
             # First we JOIN the Chord network. Therefore we initialize the
@@ -135,7 +135,7 @@ class DHTAsyncServer(asyncio.Protocol):
             print('Received client_test_msg_forward')
 
             if self.node.bootstrap_port is not None:
-                print("Closest preceding: ", self.node.__get_closest_preceding_finger(32))
+                print("Closest preceding: ", self.node.get_closest_preceding_finger(32))
                 # Make a find successor request
                 message = {
                     "action": "FIND_SUCCESSOR",
@@ -193,7 +193,7 @@ class DHTAsyncServer(asyncio.Protocol):
 
             else:
                 # Case 2: We are not the target ----> Forward message to closest preceding finger
-                precedingNode = self.node.__get_closest_preceding_finger(int(msg["key"]))
+                precedingNode = self.node.get_closest_preceding_finger(int(msg["key"]))
                 print("    - FIND_SUCCESSOR - FORWARD")
                 print("    - with destination: ", precedingNode.host_port)
 
