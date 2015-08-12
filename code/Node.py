@@ -128,14 +128,33 @@ class Node(aiomas.Agent):
             # TODO: validate input
             if "old_predecessor" in update_pred:
                 # Use successor node if chord overlay only has bootstrap node as only one
-                self.predecessor = update_pred["old_predecessor"] or successor
+                self.predecessor = update_pred["old_predecessor"]
                 self.log.info("Set predecessor: %s", self.predecessor)
             else:
                 # Something went wrong during update
                 self.log.error("Could not update predecessor reference of our successor. Try restarting.")
                 # TODO: clean exit
 
-            # Ask successor for the fingers ....
+            # Retrieve successor node for each finger 0 -> m-1 (finger 0 is already retrieved from bootstrap node)
+            for k in range(CHORD_FINGER_TABLE_SIZE - 1):
+                finger = self.fingertable[k]
+                finger_next = self.fingertable[k + 1]
+
+                if in_interval(finger_next["start"], self.id, finger["successor"]["node_id"], inclusive_left=True):
+                    self.log.info("Copy previous finger: %d in between [%d, %d)",
+                                  finger_next["start"],
+                                  self.id,
+                                  finger["successor"]["node_id"])
+                    # Reuse previous finger
+                    finger_next["successor"] = finger["successor"]
+                else:
+                    self.log.info("Exceeding our successor, need a RPC.")
+                    # TODO: validate data
+                    # BUG: if only 2 nodes in network, the node being responsible for the requested start ID
+                    #      is wrong because bootstrap node does not updated its table yet
+                    finger_successor = yield from remote_peer.rpc_find_successor(finger_next["start"])
+                    self.log.info("Node for %d: %s", finger_next["start"], finger_successor)
+                    finger_next["successor"] = finger_successor
 
         else:
             # This is the bootstrap node
@@ -225,7 +244,7 @@ class Node(aiomas.Agent):
             if self.predecessor is None or in_interval(remote_id, self.predecessor["node_id"], self.id):
                 # If this is a bootstrap node and this is the first node joining,
                 # set predecessor of new node to us. Like this, the ring topology is properly maintained
-                old_predecessor = self.predecessor
+                old_predecessor = self.predecessor or self.as_dict()
                 self.predecessor = {"node_id": remote_id, "node_address": remote_addr}
 
                 res = self.predecessor.copy()

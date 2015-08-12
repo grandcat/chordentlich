@@ -10,6 +10,6 @@ for (( p=0 ; p<$count; p++ )) # open 3 different chord nodes
 do
 	((port=$port_start + $p))
 	echo "Starting node on $port"
-	xfce4-terminal -x python3 Node.py -p $port -c $count -s $port_start
+	xfce4-terminal -H -x python3 Node.py -p $port -c $count -s $port_start
 	sleep 0.5
 done
