@@ -117,11 +117,10 @@ class Node(aiomas.Agent):
 
         for k in range(0, CHORD_FINGER_TABLE_SIZE):
             # TODO: fix i
-            self.print_finger_table()
             p = yield from self.find_predecessor((self.id - 2**k) % CHORD_RING_SIZE)
             print("peer: %s" % p)
             remote_peer = yield from self.container.connect(p["node_address"])
-            yield from remote_peer.rpc_update_finger_table(self.node_address, k)
+            yield from remote_peer.rpc_update_finger_table(self.as_dict(), k)
 
 
     @aiomas.expose
@@ -139,6 +138,15 @@ class Node(aiomas.Agent):
             successor_node = self.as_dict()
             self.__generate_fingers(successor_node)
             # self.predecessor = successor_node  # If removed, easier to replace with checks on update_predecessor
+        self.print_finger_table()
+
+        if self.bootstrap_address:
+            remote_peer = yield from self.container.connect(self.bootstrap_address)
+            ft =  yield from remote_peer.rpc_get_fingertable();
+            print("Bootstrap Finger Table: ")
+
+            self.print_finger_table(ft)
+
 
     @asyncio.coroutine
     def init_finger_table(self):
@@ -208,14 +216,31 @@ class Node(aiomas.Agent):
 
         self.log.info("Default finger table: %s", str(self.fingertable)+"\n\n")
 
-    def print_finger_table(self):
-        print("Finger table: %s" % self.fingertable)
+    def print_finger_table(self, fingerTableToPrint=None):
+        if not fingerTableToPrint:
+            fingerTableToPrint = self.fingertable
+
+        print  (" START  |   ID ")
+        print ("-----------------------")
+        for tableEntry in fingerTableToPrint:
+            if  tableEntry["successor"]:
+                print ("%s  %s" % (str(tableEntry["start"]).ljust(4), tableEntry["successor"]["node_id"] or "  -  "))
+            else:
+                print (str(tableEntry["start"]).ljust(4)+ "  -")
 
     def find_successor(self, node_id):
         node = yield from self.find_predecessor(node_id)
         print("[find_successor] Calculated node for %d: %s" % (node_id, node))
         return node["successor"]  # Attention: relies on available successor information which has to be
                                   # retrieved by closest_preceding_finger()
+    @asyncio.coroutine
+    def update_finger_table(self, origin_node, i):
+        print ("origin_node is %s successor is %s" % (origin_node,  self.fingertable[i]["successor"]["node_id"]));
+        if (in_interval(origin_node["node_id"],  self.id, self.fingertable[i]["successor"]["node_id"], inclusive_left=True)):
+             self.fingertable[i]["successor"] = origin_node
+             remote_peer = yield from self.container.connect(self.predecessor["node_address"])
+             yield from remote_peer.rpc_update_finger_table(origin_node, i)
+
     @asyncio.coroutine
     def find_predecessor(self, node_id):
         # Special case: id we are looking for is managed by our immediate successor
@@ -285,6 +310,10 @@ class Node(aiomas.Agent):
         return self.as_dict(serialize_neighbors=True)
 
     @aiomas.expose
+    def rpc_get_fingertable(self):
+        return self.fingertable
+
+    @aiomas.expose
     def rpc_update_predecessor(self, remote_node):
         if isinstance(remote_node, dict):
             remote_id = remote_node["node_id"]
@@ -308,9 +337,10 @@ class Node(aiomas.Agent):
             raise TypeError('Invalid type in argument.')
 
     @aiomas.expose
-    def rpc_update_finger_table(self, origin_node_id, i):
+    def rpc_update_finger_table(self, origin_node, i):
         # TODO: Update finger table
-        return 1
+        yield from self.update_finger_table(origin_node, i)
+        return True
 
     @aiomas.expose
     def rpc_find_successor(self, node_id):

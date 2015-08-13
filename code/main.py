@@ -6,8 +6,7 @@ import aiomas
 import hashlib
 import logging
 import sys
-import Node
-
+from Node import Node
 
 """
 Main application
@@ -44,11 +43,11 @@ loop.run_until_complete(nodes[0].join())
 #loop.run_until_complete(nodes[1].setup_node(bootstrap_address=bootstrap_addr))
 
 # Test RPC calls within the same node from backup agent 1 to agent 0
-loop.run_until_complete(nodes[1].test_get_node_id(nodes[0].addr))
+#loop.run_until_complete(nodes[1].test_get_node_id(nodes[0].addr))
 
 # Test RPC calls to bootstrap node (first port)
-if bootstrap_addr:
-    loop.run_until_complete(nodes[0].test_get_node_id(bootstrap_addr))
+#if bootstrap_addr:
+#    loop.run_until_complete(nodes[0].test_get_node_id(bootstrap_addr))
     #loop.run_until_complete(nodes[0].test_get_closest_preceding_finger(bootstrap_addr, 123))
     #loop.run_until_complete(nodes[0].test_find_my_successor(bootstrap_addr))
 
