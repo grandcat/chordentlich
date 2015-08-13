@@ -14,19 +14,26 @@ def in_interval(search_id, node_left, node_right, inclusive_left=False, inclusiv
     """
     Interval checks.
     """
-    if inclusive_left:
-        node_left = (node_left - 1) % CHORD_RING_SIZE
-    if inclusive_right:
-        node_right = (node_right + 1) % CHORD_RING_SIZE
+    # Special case must not have any manipulation to
+    if node_left != node_right:
+        if inclusive_left:
+            node_left = (node_left - 1) % CHORD_RING_SIZE
+        if inclusive_right:
+            node_right = (node_right + 1) % CHORD_RING_SIZE
 
     if node_left < node_right:
         return node_left < search_id < node_right
-    elif node_left > node_right:
-        # Circle wrapped around: separately regard cases for node_id > 0 and node_id < 0
-        return (0 <= search_id < node_right) or \
-               (node_left < search_id < CHORD_RING_SIZE)  # might be buggy, double check ranges!
     else:
-        return False
+        # First eq: search area covered is before 0
+        # Second eq: search area covered is after 0
+        #
+        # Special case: node_left == node_right
+        #   This interval is assumed to contain every ID. This is needed if the current network
+        #   only consists of the bootstrap node.
+        #   Example: random_ID is in (249,249]
+        return (search_id > max(node_left, node_right)) or \
+               (search_id < min(node_left, node_right))
+
 
 # def deserialize_minimal_node(obj):
 #     predecessor = None
@@ -232,8 +239,8 @@ class Node(aiomas.Agent):
 
                 print("Closest finger: %s" % selected_node)
                 # If still our self, we do not know closer peer and should stop searching
-                if selected_node["node_id"] == self.id:
-                    break
+                # if selected_node["node_id"] == self.id:
+                #     break
 
             else:
                 # For all other remote peers, we have to do a RPC here
