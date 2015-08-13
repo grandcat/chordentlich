@@ -239,7 +239,7 @@ class Node(aiomas.Agent):
                 # For all other remote peers, we have to do a RPC here
                 self.log.debug("Starting remote call.")
                 peer = yield from self.container.connect(selected_node["node_address"])
-                selected_node = yield from peer.rpc_get_closest_preceding_finger(selected_node["node_id"])
+                selected_node = yield from peer.rpc_get_closest_preceding_finger(node_id)
                 # TODO: validate received input before continuing the loop
                 self.log.info("Remote closest node: %s", str(selected_node))
 
@@ -267,7 +267,7 @@ class Node(aiomas.Agent):
                 # Augment node with infos about its successor (and its predecessor)
                 peer = yield from self.container.connect(finger_successor["node_address"])
                 finger_successor = yield from peer.rpc_get_node_info()  # TODO: validation
-                return finger_successor  # TODO: also return successor of this node here
+                return finger_successor
 
         return self.as_dict(serialize_neighbors=True)
 
