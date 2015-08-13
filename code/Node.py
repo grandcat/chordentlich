@@ -121,7 +121,7 @@ class Node(aiomas.Agent):
     def join(self):
 
         if self.bootstrap_address:
-            self.init_finger_table()
+            yield from self.init_finger_table()
             self.update_others()
         else:
             # This is the bootstrap node
@@ -131,7 +131,7 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def init_finger_table(self):
-
+        print("in init finger")
         # Regular node joining via bootstrap node
         self.__generate_fingers(None)
 
