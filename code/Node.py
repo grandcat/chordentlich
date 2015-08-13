@@ -104,63 +104,79 @@ class Node(aiomas.Agent):
         entry = (self.id + addition) % CHORD_RING_SIZE
         return entry
 
+    def update_others(self):
+        # Here we need to update all nodes with fingertables referring to our node
+
+        for i in range(1, m+1):
+            p = self.find_predecessor(i)
+            remote_peer = yield from self.container.connect(p["node_address"]) #
+            yield from remote_peer.rpc_update_finger_table(self.node_address, i)
+
+
     @aiomas.expose
     def get_node_id(self):
         return self.id
 
     @asyncio.coroutine
-    def init_finger_table(self):
+    def join(self):
+
         if self.bootstrap_address:
-            # Regular node joining via bootstrap node
-            self.__generate_fingers(None)
-
-            remote_peer = yield from self.container.connect(self.bootstrap_address)
-            # print("Looking for %s" % self.fingertable[0]["start"])
-            successor = yield from remote_peer.rpc_find_successor(self.fingertable[0]["start"])
-            self.fingertable[0]["successor"] = successor  # TODO: validate successor
-            self.print_finger_table()
-
-            # Fix predecessor reference on our direct successor.
-            # Retrieve the address of our direct predecessor.
-            remote_peer = yield from self.container.connect(successor["node_address"])
-            update_pred = yield from remote_peer.rpc_update_predecessor(self.as_dict())
-            self.log.debug("Predecessor update result: %s", update_pred)
-            # TODO: validate input
-            if "old_predecessor" in update_pred:
-                # Use successor node if chord overlay only has bootstrap node as only one
-                self.predecessor = update_pred["old_predecessor"]
-                self.log.info("Set predecessor: %s", self.predecessor)
-            else:
-                # Something went wrong during update
-                self.log.error("Could not update predecessor reference of our successor. Try restarting.")
-                # TODO: clean exit
-
-            # Retrieve successor node for each finger 0 -> m-1 (finger 0 is already retrieved from bootstrap node)
-            for k in range(CHORD_FINGER_TABLE_SIZE - 1):
-                finger = self.fingertable[k]
-                finger_next = self.fingertable[k + 1]
-
-                if in_interval(finger_next["start"], self.id, finger["successor"]["node_id"], inclusive_left=True):
-                    self.log.info("Copy previous finger: %d in between [%d, %d)",
-                                  finger_next["start"],
-                                  self.id,
-                                  finger["successor"]["node_id"])
-                    # Reuse previous finger
-                    finger_next["successor"] = finger["successor"]
-                else:
-                    self.log.info("Exceeding our successor, need a RPC.")
-                    # TODO: validate data
-                    # BUG: if only 2 nodes in network, the node being responsible for the requested start ID
-                    #      is wrong because bootstrap node does not updated its table yet
-                    finger_successor = yield from remote_peer.rpc_find_successor(finger_next["start"])
-                    self.log.info("Node for %d: %s", finger_next["start"], finger_successor)
-                    finger_next["successor"] = finger_successor
-
+            self.init_finger_table()
+            self.update_others()
         else:
             # This is the bootstrap node
             successor_node = self.as_dict()
             self.__generate_fingers(successor_node)
             # self.predecessor = successor_node  # If removed, easier to replace with checks on update_predecessor
+
+    @asyncio.coroutine
+    def init_finger_table(self):
+
+        # Regular node joining via bootstrap node
+        self.__generate_fingers(None)
+
+        remote_peer = yield from self.container.connect(self.bootstrap_address)
+        # print("Looking for %s" % self.fingertable[0]["start"])
+        successor = yield from remote_peer.rpc_find_successor(self.fingertable[0]["start"])
+        self.fingertable[0]["successor"] = successor  # TODO: validate successor
+        self.print_finger_table()
+
+        # Fix predecessor reference on our direct successor.
+        # Retrieve the address of our direct predecessor.
+        remote_peer = yield from self.container.connect(successor["node_address"])
+        update_pred = yield from remote_peer.rpc_update_predecessor(self.as_dict())
+        self.log.debug("Predecessor update result: %s", update_pred)
+        # TODO: validate input
+        if "old_predecessor" in update_pred:
+            # Use successor node if chord overlay only has bootstrap node as only one
+            self.predecessor = update_pred["old_predecessor"]
+            self.log.info("Set predecessor: %s", self.predecessor)
+        else:
+            # Something went wrong during update
+            self.log.error("Could not update predecessor reference of our successor. Try restarting.")
+            # TODO: clean exit
+
+        # Retrieve successor node for each finger 0 -> m-1 (finger 0 is already retrieved from bootstrap node)
+        for k in range(CHORD_FINGER_TABLE_SIZE - 1):
+            finger = self.fingertable[k]
+            finger_next = self.fingertable[k + 1]
+
+            if in_interval(finger_next["start"], self.id, finger["successor"]["node_id"], inclusive_left=True):
+                self.log.info("Copy previous finger: %d in between [%d, %d)",
+                              finger_next["start"],
+                              self.id,
+                              finger["successor"]["node_id"])
+                # Reuse previous finger
+                finger_next["successor"] = finger["successor"]
+            else:
+                self.log.info("Exceeding our successor, need a RPC.")
+                # TODO: validate data
+                # BUG: if only 2 nodes in network, the node being responsible for the requested start ID
+                #      is wrong because bootstrap node does not updated its table yet
+                finger_successor = yield from remote_peer.rpc_find_successor(finger_next["start"])
+                self.log.info("Node for %d: %s", finger_next["start"], finger_successor)
+                finger_next["successor"] = finger_successor
+
 
         # Optimization for joining node (if not bootstrap node)
         # - Find close node to myself (e.g., successor)
@@ -260,6 +276,11 @@ class Node(aiomas.Agent):
             raise TypeError('Invalid type in argument.')
 
     @aiomas.expose
+    def rpc_update_finger_table(self, origin_node_id, i):
+        # TODO: Update finger table
+        return 1
+
+    @aiomas.expose
     def rpc_find_successor(self, node_id):
         # TODO: validate params to prevent attacks!
         return self.find_successor(node_id)
@@ -323,7 +344,7 @@ nodes = [c.spawn(Node) for i in range(2)]
 # Start async server
 loop = asyncio.get_event_loop()
 loop.run_until_complete(nodes[0].setup_node(bootstrap_address=bootstrap_addr))
-loop.run_until_complete(nodes[0].init_finger_table())
+loop.run_until_complete(nodes[0].join())
 #loop.run_until_complete(nodes[1].setup_node(bootstrap_address=bootstrap_addr))
 
 # Test RPC calls within the same node from backup agent 1 to agent 0
