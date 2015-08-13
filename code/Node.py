@@ -219,6 +219,7 @@ class Node(aiomas.Agent):
 
         selected_node = self.as_dict(serialize_neighbors=True)
         previous_selected_node = None
+
         while not in_interval(node_id, selected_node["node_id"], selected_node["successor"]["node_id"], inclusive_right=True):
             self.log.info("Node ID %d not in interval (%d, %d]",
                           node_id,
@@ -227,10 +228,8 @@ class Node(aiomas.Agent):
             if selected_node["node_id"] == self.id:
                 # Typically in first round: use our finger table to locate close peer
                 print("Looking for predecessor of %d in first round." % node_id)
-                selected_node = self.get_closest_preceding_finger(node_id)
-                # Augment node with infos about its successor
-                peer = yield from self.container.connect(selected_node["node_address"])
-                selected_node = yield from peer.rpc_get_node_info()  # TODO: validation
+                selected_node = yield from self.get_closest_preceding_finger(node_id)
+
                 print("Closest finger: %s" % selected_node)
                 # If still our self, we do not know closer peer and should stop searching
                 if selected_node["node_id"] == self.id:
@@ -241,7 +240,6 @@ class Node(aiomas.Agent):
                 self.log.debug("Starting remote call.")
                 peer = yield from self.container.connect(selected_node["node_address"])
                 selected_node = yield from peer.rpc_get_closest_preceding_finger(selected_node["node_id"])
-                # TODO important: augment node
                 # TODO: validate received input before continuing the loop
                 self.log.info("Remote closest node: %s", str(selected_node))
 
@@ -253,6 +251,7 @@ class Node(aiomas.Agent):
 
         return selected_node
 
+    @asyncio.coroutine
     def get_closest_preceding_finger(self, node_id):
         """
         Find closest preceding finger within m -> 0 fingers.
@@ -265,6 +264,9 @@ class Node(aiomas.Agent):
             self.log.debug("Iterate finger %d: %d in %s", k, node_id, self.fingertable[k])
 
             if in_interval(finger_successor["node_id"], self.id, node_id):
+                # Augment node with infos about its successor (and its predecessor)
+                peer = yield from self.container.connect(finger_successor["node_address"])
+                finger_successor = yield from peer.rpc_get_node_info()  # TODO: validation
                 return finger_successor  # TODO: also return successor of this node here
 
         return self.as_dict(serialize_neighbors=True)
@@ -311,7 +313,8 @@ class Node(aiomas.Agent):
     @aiomas.expose
     def rpc_get_closest_preceding_finger(self, node_id):
         # TODO: validate params to prevent attacks!
-        return self.get_closest_preceding_finger(node_id)
+        res = yield from self.get_closest_preceding_finger(node_id)
+        return res
 
     ### RPC tests ###
     @asyncio.coroutine
