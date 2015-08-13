@@ -104,13 +104,17 @@ class Node(aiomas.Agent):
         entry = (self.id + addition) % CHORD_RING_SIZE
         return entry
 
+    @asyncio.coroutine
     def update_others(self):
         # Here we need to update all nodes with fingertables referring to our node
 
-        for i in range(1, m+1):
-            p = self.find_predecessor(i)
-            remote_peer = yield from self.container.connect(p["node_address"]) #
-            yield from remote_peer.rpc_update_finger_table(self.node_address, i)
+        for k in range(0, CHORD_FINGER_TABLE_SIZE):
+            # TODO: fix i
+            self.print_finger_table()
+            p = yield from self.find_predecessor((self.id - 2**k) % CHORD_RING_SIZE)
+            print("peer: %s" % p)
+            remote_peer = yield from self.container.connect(p["node_address"])
+            yield from remote_peer.rpc_update_finger_table(self.node_address, k)
 
 
     @aiomas.expose
@@ -122,7 +126,7 @@ class Node(aiomas.Agent):
 
         if self.bootstrap_address:
             yield from self.init_finger_table()
-            self.update_others()
+            yield from self.update_others()
         else:
             # This is the bootstrap node
             successor_node = self.as_dict()
@@ -214,11 +218,19 @@ class Node(aiomas.Agent):
             return self.as_dict(serialize_neighbors=True)
 
         selected_node = self.as_dict(serialize_neighbors=True)
+        previous_selected_node = None
         while not in_interval(node_id, selected_node["node_id"], selected_node["successor"]["node_id"], inclusive_right=True):
+            self.log.info("Node ID %d not in interval (%d, %d]",
+                          node_id,
+                          selected_node["node_id"],
+                          selected_node["successor"]["node_id"])
             if selected_node["node_id"] == self.id:
                 # Typically in first round: use our finger table to locate close peer
-                print("Looking for predecessor in first round.")
+                print("Looking for predecessor of %d in first round." % node_id)
                 selected_node = self.get_closest_preceding_finger(node_id)
+                # Augment node with infos about its successor
+                peer = yield from self.container.connect(selected_node["node_address"])
+                selected_node = yield from peer.rpc_get_node_info()  # TODO: validation
                 print("Closest finger: %s" % selected_node)
                 # If still our self, we do not know closer peer and should stop searching
                 if selected_node["node_id"] == self.id:
@@ -229,8 +241,15 @@ class Node(aiomas.Agent):
                 self.log.debug("Starting remote call.")
                 peer = yield from self.container.connect(selected_node["node_address"])
                 selected_node = yield from peer.rpc_get_closest_preceding_finger(selected_node["node_id"])
+                # TODO important: augment node
                 # TODO: validate received input before continuing the loop
                 self.log.info("Remote closest node: %s", str(selected_node))
+
+            # Detect loop without progress
+            if previous_selected_node == selected_node:
+                self.log.error("No progress while looking for node closer to ID %d than node %s", node_id, selected_node)
+                raise aiomas.RemoteException("Remote peer did not return more closer node to given Id " + str(node_id), "")
+            previous_selected_node = selected_node
 
         return selected_node
 
@@ -246,12 +265,16 @@ class Node(aiomas.Agent):
             self.log.debug("Iterate finger %d: %d in %s", k, node_id, self.fingertable[k])
 
             if in_interval(finger_successor["node_id"], self.id, node_id):
-                return finger_successor
+                return finger_successor  # TODO: also return successor of this node here
 
         return self.as_dict(serialize_neighbors=True)
 
 
     ### RPC wrappers and functions ###
+    @aiomas.expose
+    def rpc_get_node_info(self):
+        return self.as_dict(serialize_neighbors=True)
+
     @aiomas.expose
     def rpc_update_predecessor(self, remote_node):
         if isinstance(remote_node, dict):
