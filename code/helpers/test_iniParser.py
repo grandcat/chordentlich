@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# Note: Always use run.sh to run the tests!
+# Note: Always use unittest.sh to run the tests!
 
 import unittest
 import imp

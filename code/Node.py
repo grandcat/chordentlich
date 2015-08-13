@@ -219,6 +219,7 @@ class Node(aiomas.Agent):
 
         selected_node = self.as_dict(serialize_neighbors=True)
         previous_selected_node = None
+
         while not in_interval(node_id, selected_node["node_id"], selected_node["successor"]["node_id"], inclusive_right=True):
             self.log.info("Node ID %d not in interval (%d, %d]",
                           node_id,
@@ -240,7 +241,7 @@ class Node(aiomas.Agent):
                 # For all other remote peers, we have to do a RPC here
                 self.log.debug("Starting remote call.")
                 peer = yield from self.container.connect(selected_node["node_address"])
-                selected_node = yield from peer.rpc_get_closest_preceding_finger(selected_node["node_id"])
+                selected_node = yield from peer.rpc_get_closest_preceding_finger(node_id)
                 # TODO important: augment node
                 # TODO: validate received input before continuing the loop
                 self.log.info("Remote closest node: %s", str(selected_node))
