@@ -119,8 +119,9 @@ class Node(aiomas.Agent):
             # TODO: fix i
             p = yield from self.find_predecessor((self.id - 2**k) % CHORD_RING_SIZE)
             print("peer: %s" % p)
-            remote_peer = yield from self.container.connect(p["node_address"])
-            yield from remote_peer.rpc_update_finger_table(self.as_dict(), k)
+            if self.id != p["node_id"]:
+                remote_peer = yield from self.container.connect(p["node_address"])
+                yield from remote_peer.rpc_update_finger_table(self.as_dict(), k)
 
 
     @aiomas.expose
@@ -131,6 +132,7 @@ class Node(aiomas.Agent):
     def join(self):
 
         if self.bootstrap_address:
+            # Regular node joining via bootstrap node
             yield from self.init_finger_table()
             yield from self.update_others()
         else:
@@ -142,16 +144,14 @@ class Node(aiomas.Agent):
 
         if self.bootstrap_address:
             remote_peer = yield from self.container.connect(self.bootstrap_address)
-            ft =  yield from remote_peer.rpc_get_fingertable();
+            ft =  yield from remote_peer.rpc_get_fingertable()
             print("Bootstrap Finger Table: ")
-
             self.print_finger_table(ft)
 
 
     @asyncio.coroutine
     def init_finger_table(self):
         print("in init finger")
-        # Regular node joining via bootstrap node
         self.__generate_fingers(None)
 
         remote_peer = yield from self.container.connect(self.bootstrap_address)
@@ -160,20 +160,8 @@ class Node(aiomas.Agent):
         self.fingertable[0]["successor"] = successor  # TODO: validate successor
         self.print_finger_table()
 
-        # Fix predecessor reference on our direct successor.
-        # Retrieve the address of our direct predecessor.
-        remote_peer = yield from self.container.connect(successor["node_address"])
-        update_pred = yield from remote_peer.rpc_update_predecessor(self.as_dict())
-        self.log.debug("Predecessor update result: %s", update_pred)
-        # TODO: validate input
-        if "old_predecessor" in update_pred:
-            # Use successor node if chord overlay only has bootstrap node as only one
-            self.predecessor = update_pred["old_predecessor"]
-            self.log.info("Set predecessor: %s", self.predecessor)
-        else:
-            # Something went wrong during update
-            self.log.error("Could not update predecessor reference of our successor. Try restarting.")
-            # TODO: clean exit
+        # Fix references of our direct neighbors
+        yield from self.update_neighbors(successor)
 
         # Retrieve successor node for each finger 0 -> m-1 (finger 0 is already retrieved from bootstrap node)
         for k in range(CHORD_FINGER_TABLE_SIZE - 1):
@@ -228,28 +216,51 @@ class Node(aiomas.Agent):
             else:
                 print (str(tableEntry["start"]).ljust(4)+ "  -")
 
+    @asyncio.coroutine
+    def update_neighbors(self, successor):
+        """
+        Update our successor's reference that it is aware of us (according to default
+        Chord specification).
+        Notify our direct predecessor about our presence. This allows to correct its
+        1. finger early.
+        """
+        # Fix predecessor reference on our immediate successor
+        remote_peer = yield from self.container.connect(successor["node_address"])
+        update_pred = yield from remote_peer.rpc_update_predecessor(self.as_dict())
+        self.log.debug("Predecessor update result: %s", update_pred)
+        # TODO: validate input
+        if "old_predecessor" in update_pred:
+            # Use successor node if chord overlay only has bootstrap node as only one
+            self.predecessor = update_pred["old_predecessor"]
+            self.log.info("Set predecessor: %s", self.predecessor)
+
+            # Notify our predecessor to be aware of us (new immediate successor)
+            remote_peer = yield from self.container.connect(self.predecessor["node_address"])
+            yield from remote_peer.rpc_update_successor(self.as_dict())
+        else:
+            # Something went wrong during update
+            self.log.error("Could not update predecessor reference of our successor. Try restarting.")
+            # TODO: clean exit
+
     def find_successor(self, node_id):
-        node = yield from self.find_predecessor(node_id)
-        print("[find_successor] Calculated node for %d: %s" % (node_id, node))
-        return node["successor"]  # Attention: relies on available successor information which has to be
-                                  # retrieved by closest_preceding_finger()
+        successor = self.fingertable[0]["successor"]
+        if in_interval(node_id, self.id, successor["node_id"], inclusive_right=True):
+            return successor
+        else:
+            node = yield from self.find_predecessor(node_id)
+            print("[find_successor] Calculated node for %d: %s" % (node_id, node))
+            return node["successor"]  # Attention: relies on available successor information which has to be
+                                      # retrieved by closest_preceding_finger()
     @asyncio.coroutine
     def update_finger_table(self, origin_node, i):
-        self.print_finger_table()
-        print ("origin_node is %s successor is %s" % (origin_node,  self.fingertable[i]["successor"]["node_id"]));
-        if (in_interval(origin_node["node_id"],  self.id, self.fingertable[i]["successor"]["node_id"], inclusive_left=True)):
+        print ("For finger %d: origin_node is %s; successor was %s" % (i, origin_node, self.fingertable[i]["successor"]["node_id"]))
+        if in_interval(origin_node["node_id"], self.id, self.fingertable[i]["successor"]["node_id"], inclusive_left=True):
              self.fingertable[i]["successor"] = origin_node
              remote_peer = yield from self.container.connect(self.predecessor["node_address"])
-             yield from remote_peer.rpc_update_finger_table(origin_node, i)
+             #yield from remote_peer.rpc_update_finger_table(origin_node, i)
 
     @asyncio.coroutine
     def find_predecessor(self, node_id):
-        # Special case: id we are looking for is managed by our immediate successor
-        successor = self.fingertable[0]["successor"]
-        if in_interval(node_id, self.id, successor["node_id"]):
-            print("Special case")
-            return self.as_dict(serialize_neighbors=True)
-
         selected_node = self.as_dict(serialize_neighbors=True)
         previous_selected_node = None
 
@@ -336,6 +347,30 @@ class Node(aiomas.Agent):
 
         else:
             raise TypeError('Invalid type in argument.')
+
+    @aiomas.expose
+    def rpc_update_successor(self, new_node):
+        if not isinstance(new_node, dict):
+            raise TypeError('Invalid type in argument.')
+
+        # TODO: validation of types and range
+        old_successor = self.fingertable[0]["successor"]
+        if in_interval(new_node["node_id"], self.id, old_successor["node_id"]):
+            # Check old successor whether it already accepted new node
+            peer = yield from self.container.connect(old_successor["node_address"])
+            old_successor_view = yield from peer.rpc_get_node_info()  # TODO: validation + timeout catch
+
+            if old_successor_view["predecessor"]["node_address"] == new_node["node_address"]:
+                # Update finger table to point to new immediate successor
+                self.fingertable[0]["successor"] = new_node
+                self.log.info("Updated successor reference to node %d (%s)",
+                              new_node["node_id"], new_node["node_address"])
+            else:
+                # Do not update, only mention suspicious observation
+                self.log.error("Node %d (%s) wants to be our immediate successor, but original successor %d (%s) "
+                               "does not reference it. Looks malicious.",
+                               new_node["node_id"], new_node["node_address"],
+                               old_successor["node_id"], old_successor["node_address"])
 
     @aiomas.expose
     def rpc_update_finger_table(self, origin_node, i):
