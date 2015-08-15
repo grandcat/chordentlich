@@ -235,6 +235,7 @@ class Node(aiomas.Agent):
                                   # retrieved by closest_preceding_finger()
     @asyncio.coroutine
     def update_finger_table(self, origin_node, i):
+        self.print_finger_table()
         print ("origin_node is %s successor is %s" % (origin_node,  self.fingertable[i]["successor"]["node_id"]));
         if (in_interval(origin_node["node_id"],  self.id, self.fingertable[i]["successor"]["node_id"], inclusive_left=True)):
              self.fingertable[i]["successor"] = origin_node
