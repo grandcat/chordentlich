@@ -4,10 +4,11 @@ class DHTMessage():
     def read_file(self, filename):
         with open(filename, "rb") as f:
             self.data = f.read()
+        self.parse()
     pass
 
-    def make(self):
-        command =  msg2.data[16:32].decode("utf-8").strip()
+    def parse(self):
+        command =  self.data[16:32].decode("utf-8").strip()
         print(command)
         if command=="MSG_DHT_GET":
             self.message = DHTMessageGET(self.data, self.getSize())
@@ -25,7 +26,7 @@ class DHTMessage():
             pass
 
     def getSize(self):
-        return int(msg2.data[0:16].decode("utf-8"))
+        return int(self.data[0:16].decode("utf-8"))
 
 class DHTMessageParent():
     def __init__(self, data, size):
@@ -34,18 +35,19 @@ class DHTMessageParent():
 
 class DHTMessagePUT(DHTMessageParent):
     def get_key(self):
-        return self.data[32:288].decode("utf-8")
+        return self.data[32:64].decode("utf-8")
     def get_ttl(self):
-        return self.data[288:304].decode("utf-8")
+        return int(self.data[64:80].decode("utf-8"))
     def get_replication(self):
-        return self.data[304:312].decode("utf-8")
+        return self.data[80:88].decode("utf-8")
     def get_reserved(self):
-        return self.data[312:352].decode("utf-8")
+        return self.data[88:128].decode("utf-8")
     def get_content(self):
-        return self.data[352:352+self.size].decode("utf-8")
+        return self.data[128:128+self.size].decode("utf-8")
 
 class DHTMessageGET(DHTMessageParent):
-    pass
+    def get_key(self):
+        return self.data[32:288].decode("utf-8")
 
 class DHTMessageGET_REPLY:
     pass
@@ -58,13 +60,3 @@ class DHTMessageTRACE_REPLY:
 
 class DHTMessageERROR:
     pass
-
-msg2 = DHTMessage()
-msg2.read_file('test_messages/DHTPUT')
-msg2.make()
-
-print("key is", msg2.message.get_key())
-print("ttl is", msg2.message.get_ttl())
-print("replication is", msg2.message.get_replication())
-print("reserved is", msg2.message.get_reserved())
-print("content is", msg2.message.get_content())
