@@ -19,9 +19,9 @@ class TestStorage(unittest.TestCase):
       self.assertEqual(len(storage.data), 2)
 
       longTimeAgo = datetime.datetime.today() - datetime.timedelta(2) # insert item from two days ago
-      storage.put("a", "long", longTimeAgo)
-      
       print("Testing Data Storage Removal of old items")
+      storage.put("a", "long", longTimeAgo)
+
       self.assertEqual(storage.get("a"), "long")
       storage.clean_old()
       self.assertEqual(storage.get("a"), None)
