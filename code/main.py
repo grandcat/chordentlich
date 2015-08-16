@@ -38,8 +38,7 @@ c = aiomas.Container(("localhost", port))
 nodes = [c.spawn(Node) for i in range(2)]
 # Start async server
 loop = asyncio.get_event_loop()
-loop.run_until_complete(nodes[0].setup_node(bootstrap_address=bootstrap_addr))
-loop.run_until_complete(nodes[0].join())
+loop.run_until_complete(nodes[0].join(bootstrap_address=bootstrap_addr))
 #loop.run_until_complete(nodes[1].setup_node(bootstrap_address=bootstrap_addr))
 
 # Test RPC calls within the same node from backup agent 1 to agent 0

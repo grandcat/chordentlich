@@ -1,11 +1,8 @@
 #!/usr/bin/python3
 import asyncio
-import getopt
-
 import aiomas
 import hashlib
 import logging
-import sys
 
 CHORD_FINGER_TABLE_SIZE = 8 # TODO: 256
 CHORD_RING_SIZE = 2**CHORD_FINGER_TABLE_SIZE  # Maximum number of addresses in the Chord network
@@ -65,23 +62,8 @@ class Node(aiomas.Agent):
         # Logging
         self.log = logging.getLogger(__name__)
         self.log.info("Node server listening on %s.", node_address)
-        # Node state
+        # Overlay network info
         self.fingertable = []
-
-    @asyncio.coroutine
-    def setup_node(self, node_id=None, node_address=None, bootstrap_address=None):
-        """
-        Set ups all internal state variables needed for operation.
-        Needs to be called previously to any other function or RPC call.
-        """
-        self.id = node_id or self.generate_key(self.node_address)
-        self.node_address = self.node_address or node_address   # only overwrite address if created by deserialization
-        self.bootstrap_address = bootstrap_address
-        self.predecessor = None
-        self.log.info("[Configuration]  node_id: %d, bootstrap_node: %s", self.id, self.bootstrap_address)
-
-        # Create first version of finger table to prevent crash during message forward when debugging
-        # self.init_finger_table()
 
     def as_dict(self, serialize_neighbors=False):
         dict_node = {
@@ -129,7 +111,27 @@ class Node(aiomas.Agent):
         return self.id
 
     @asyncio.coroutine
-    def join(self):
+    def join(self, node_id=None, node_address=None, bootstrap_address=None):
+        """
+        Set ups all internal state variables needed for operation.
+        Needs to be called previously to any other function or RPC call.
+
+        :param node_id:
+            optional node ID.
+            If not supplied, it will be generated automatically.
+
+        :param node_address:
+            optional node address formatted as an aiomas agent address (IPv4 or IPv6 address)
+
+        :param bootstrap_address:
+            if not given, a new Chord network is created. Otherwise, the new node
+            will gather the required information to integrate into the Chord network.
+        """
+        self.id = node_id or self.generate_key(self.node_address)
+        self.node_address = self.node_address or node_address   # normally already set in __init__
+        self.bootstrap_address = bootstrap_address
+        self.predecessor = None
+        self.log.info("[Configuration]  node_id: %d, bootstrap_node: %s", self.id, self.bootstrap_address)
 
         if self.bootstrap_address:
             # Regular node joining via bootstrap node
@@ -208,8 +210,8 @@ class Node(aiomas.Agent):
         if not fingerTableToPrint:
             fingerTableToPrint = self.fingertable
 
-        print  (" START  |   ID ")
-        print ("-----------------------")
+        print(" START  |   ID ")
+        print("-----------------------")
         for tableEntry in fingerTableToPrint:
             if  tableEntry["successor"]:
                 print ("%s  %s" % (str(tableEntry["start"]).ljust(4), tableEntry["successor"]["node_id"] or "  -  "))
@@ -253,11 +255,12 @@ class Node(aiomas.Agent):
                                       # retrieved by closest_preceding_finger()
     @asyncio.coroutine
     def update_finger_table(self, origin_node, i):
-        print ("For finger %d: origin_node is %s; successor was %s" % (i, origin_node, self.fingertable[i]["successor"]["node_id"]))
         if in_interval(origin_node["node_id"], self.id, self.fingertable[i]["successor"]["node_id"], inclusive_left=True):
-             self.fingertable[i]["successor"] = origin_node
-             remote_peer = yield from self.container.connect(self.predecessor["node_address"])
-             #yield from remote_peer.rpc_update_finger_table(origin_node, i)
+            self.log.info("For finger %d: origin_node is %s; successor was %s",
+                          i, origin_node, self.fingertable[i]["successor"]["node_id"])
+            self.fingertable[i]["successor"] = origin_node
+            remote_peer = yield from self.container.connect(self.predecessor["node_address"])
+            # yield from remote_peer.rpc_update_finger_table(origin_node, i)
 
     @asyncio.coroutine
     def find_predecessor(self, node_id):
@@ -355,6 +358,7 @@ class Node(aiomas.Agent):
 
         # TODO: validation of types and range
         old_successor = self.fingertable[0]["successor"]
+        # New successor before old one or old one not responding anymore (last option is TODO)
         if in_interval(new_node["node_id"], self.id, old_successor["node_id"]):
             # Check old successor whether it already accepted new node
             peer = yield from self.container.connect(old_successor["node_address"])
