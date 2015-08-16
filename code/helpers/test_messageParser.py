@@ -19,15 +19,29 @@ class TestMessageParser(unittest.TestCase):
         print("reserved is", msg2.message.get_reserved())
         print("content is", msg2.message.get_content())
 
-        self.assertEqual( msg2.message.get_content(), "HELLO WORLD")
-        self.assertEqual(msg2.message.get_ttl(), 9)
+        self.assertEqual( msg2.message.get_content(), "HALLO WELT")
+        self.assertEqual(msg2.message.get_ttl(), 1)
 
         msg3 = DHTMessage()
         msg3.read_file('helpers/test_messages/DHTGET')
 
-        self.assertEqual(msg2.message.get_key(), "11111111111111111111111111111111")
+        self.assertEqual(msg3.message.get_key(), 1229782938247303441)
+
+        msg3 = DHTMessage()
+        msg3.read_file('helpers/test_messages/DHTTRACE')
+
+        self.assertEqual(msg3.message.get_key(), 1229782938247303441)
+
+        hop = DHTHop(123, 123, "1.1.1.1", "FE80:0000:0000:0000:0202:B3FF:FE1E:8329")
 
 
+        # Generate a new TRACE REPLY
+        hops = [
+            DHTHop(123, 213, "1.1.1.1", "FE80:0000:0000:0000:0202:B3FF:FE1E:8329"),
+            DHTHop(123, 213, "1.1.1.1", "FE80:0000:0000:0000:0202:B3FF:FE1E:8329")
+        ]
+
+        msg4 = DHTMessageTRACE_REPLY(123, hops)
 
 
 if __name__ == '__main__':
