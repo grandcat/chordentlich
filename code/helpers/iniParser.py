@@ -5,18 +5,12 @@
 # entry (HOSTKEY), we wrote our own
 #
 
-#
-# Function to validate the configuration fingertable
-# This may be useful if a config file for an old version
-# is intended to be used with a newer version of the application
-#
-
 class IniParser:
     def __init__(self, filename):
         self.data = {}
-        self.readFile(filename)
+        self.read_file(filename)
 
-    def readFile(self, filename):
+    def read_file(self, filename):
 
         currentsection = "" # The current seciotn in the parser (like [DHT] for example)
         self.data = {}
@@ -36,5 +30,10 @@ class IniParser:
     def get(self, attribute, section=""):
         return self.data[section][attribute]
 
-    def validateConfig(self):
+    #
+    # Function to validate the configuration fingertable
+    # This may be useful if a config file for an old version
+    # is intended to be used with a newer version of the application
+    #
+    def validate_config(self):
         pass # TODO: check config file if all required attributes are contained
