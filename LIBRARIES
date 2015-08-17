@@ -1,1 +1,4 @@
+# install aiomas
 sudo pip3 install aiomas
+# autodoc generator install
+pip3 install Sphinx
