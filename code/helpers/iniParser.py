@@ -1,11 +1,24 @@
 #!/usr/bin/python3
 
-# Please note that there is also a python module named configparser. However,
-# as the example ini module contanined no section header for the first
-# entry (HOSTKEY), we wrote our own
+
 #
 
+"""
+Helper class to parse the ini files.
+
+Please note that there is also a python module named configparser. However,
+as the example ini module contanined no section header for the first
+entry (HOSTKEY), we wrote our own
+
+"""
+
 class IniParser:
+    """
+    Initializes a DHT_TRACE_REPLY message to send later.
+
+    :param filename: The filename. Example: "config.ini"
+    :type filename: string
+    """
     def __init__(self, filename):
         self.data = {}
         self.read_file(filename)
@@ -28,12 +41,20 @@ class IniParser:
                         self.data[currentsection][ar[0].strip()] = ar[1].strip()
 
     def get(self, attribute, section=""):
-        return self.data[section][attribute]
+        """
+        get an attribute of an ini file
 
-    #
-    # Function to validate the configuration fingertable
-    # This may be useful if a config file for an old version
-    # is intended to be used with a newer version of the application
-    #
-    def validate_config(self):
-        pass # TODO: check config file if all required attributes are contained
+        :param attribute: The attribute
+        :param section: The section. Default is no section
+        :type attribute: string
+        :Example:
+
+             .. code-block:: python
+
+                #test.ini:
+                #[DHT]
+                #PORT = 123
+                inip = IniParser("test.ini")
+                inip.get("PORT", "DHT") # returns  123
+        """
+        return self.data[section][attribute]
