@@ -5,6 +5,8 @@ import aiomas
 import hashlib
 import logging
 
+from helpers.storage import Storage
+
 CHORD_FINGER_TABLE_SIZE = 8 # TODO: 256
 CHORD_RING_SIZE = 2**CHORD_FINGER_TABLE_SIZE  # Maximum number of addresses in the Chord network
 
@@ -66,6 +68,7 @@ class Node(aiomas.Agent):
         # Node state
         self.activated = True
         self.fix_interval = 7 + random.randint(0, 10)
+        self.storage = Storage()
         # Overlay network info
         self.fingertable = []
 
@@ -215,6 +218,10 @@ class Node(aiomas.Agent):
                 print("%s  %s" % (str(tableEntry["start"]).ljust(4), tableEntry["successor"]["node_id"]))
             else:
                 print(str(tableEntry["start"]).ljust(4)+ "  -  ")
+
+
+        if self.predecessor:
+            print("Predecessor ID: %d" % self.predecessor["node_id"])
 
     @asyncio.coroutine
     def update_finger_table(self, origin_node, i):
@@ -411,9 +418,41 @@ class Node(aiomas.Agent):
 
             print("Current finger table:")
             self.print_finger_table()
+            print("Stored entries: ", len(self.storage.data))
 
+    @asyncio.coroutine
+    def put_data(self, key, data, ttl):
+        storage_node = yield from self.find_successor(key)
+        print("Found successor for storage: ", storage_node)
 
-    ### RPC wrappers and functions ###
+        if storage_node["node_id"] == self.id:
+            self.storage.put(key, data, ttl=ttl)
+            return {
+                "status": 0
+            }
+        else:
+            # Directly connect to remote peer and store it there
+            peer = yield from self.container.connect(storage_node["node_address"])
+            result = yield from peer.rpc_dht_put_data(key, data, ttl=ttl)  # TODO: validate
+            return result
+
+    @asyncio.coroutine
+    def get_data(self, key):
+        storage_node = yield from self.find_successor(key)
+
+        if storage_node["node_id"] == self.id:
+            return {
+                "status": 0,
+                "data": self.storage.get(key)
+            }
+        else:
+            # Directly connect to remote peer and fetch data from there
+            peer = yield from self.container.connect(storage_node["node_address"])
+            result = yield from peer.rpc_dht_get_data(key)  # TODO: validate
+            return result
+
+    ##########################################################################
+    ### RPC wrappers and functions for maintaining Chord's network overlay ###
     @aiomas.expose
     def rpc_get_node_info(self):
         return self.as_dict(serialize_neighbors=True)
@@ -470,6 +509,36 @@ class Node(aiomas.Agent):
         # TODO: validate params to prevent attacks!
         res = yield from self.get_closest_preceding_finger(node_id)
         return res
+
+    ### RPC Data storage ###
+    @aiomas.expose
+    def rpc_dht_put_data(self, key, data, ttl):
+        # TODO: validate
+        if in_interval(key, self.predecessor["node_id"], self.id, inclusive_right=True):
+            self.storage.put(key, data, ttl=ttl)
+            return {
+                "status": 0
+            }
+        else:
+            self.log.warn("This node %d is not responsible for storing data with key %d.",
+                          self.id, key)
+            return {
+                "status": -1,
+                "message": "not responsible"
+            }
+
+    @aiomas.expose
+    def rpc_dht_get_data(self, key):
+        if in_interval(key, self.predecessor["node_id"], self.id, inclusive_right=True):
+            data = self.storage.get(key)
+            return {
+                "status": 0,
+                "data": data
+            }
+        else:
+            return {
+                "status": -1
+            }
 
     ### RPC tests ###
     @asyncio.coroutine

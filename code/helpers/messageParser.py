@@ -29,6 +29,15 @@ class DHTMessage():
     """
     Base class for other classes parsing incoming data such as as DHTMessagePUT
     """
+    def __init__(self):
+        self.message = None
+
+    def read(self, data_in):
+        """Reads a binary input message.
+        """
+        self.data = data_in
+        return self.parse()
+
     def read_file(self, filename):
         """Read a binary file representing a message. The message is automatically parsed
         afterwards.
@@ -37,8 +46,8 @@ class DHTMessage():
         """
         with open(filename, "rb") as f:
             self.data = f.read()
-        self.parse()
-    pass
+
+        return self.parse()
 
     def parse(self):
         """
@@ -61,6 +70,8 @@ class DHTMessage():
             self.message = DHTMessageERROR(self.data, self.getSize())
         else: # TODO: throw exception here
             pass
+
+        return self.message
 
     def getSize(self):
         """

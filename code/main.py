@@ -3,10 +3,10 @@ import asyncio
 import getopt
 
 import aiomas
-import hashlib
 import logging
 import sys
 from Node import Node
+from ipc import ApiServer
 
 """
 Main application
@@ -33,14 +33,19 @@ bootstrap_addr = ("tcp://localhost:" + str(port_start) + "/0") if port != port_s
 print("Address/Port of Bootstrap Node: ", (bootstrap_addr or "this node"))
 print("-------------------")
 
+# TODO: parse INI config file here
+
 # Define multiple agents per node for accepting RPCs
 c = aiomas.Container(("localhost", port))
-nodes = [c.spawn(Node) for i in range(2)]
-# Start async server
+nodes = [c.spawn(Node) for i in range(1)]
+
 loop = asyncio.get_event_loop()
+# Start API server interface
+api_server = loop.create_server(lambda: ApiServer(nodes[0]), "127.0.0.1", 3086 + port)
+loop.run_until_complete(api_server)
+# Start DHT node
 loop.run_until_complete(nodes[0].join(bootstrap_address=bootstrap_addr))
 loop.run_until_complete(nodes[0].stabilize())
-#loop.run_until_complete(nodes[1].setup_node(bootstrap_address=bootstrap_addr))
 
 # Test RPC calls within the same node from backup agent 1 to agent 0
 #loop.run_until_complete(nodes[1].test_get_node_id(nodes[0].addr))
