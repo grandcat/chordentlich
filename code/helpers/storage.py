@@ -55,7 +55,7 @@ class Storage:
         """
         returnValues = []
         if not key in self.data or len(self.data[key]) == 0:
-            return None
+            return []
         else:
             for key2, val in enumerate(self.data[key]):
                 returnValues.append( self.data[key][key2]["value"])
