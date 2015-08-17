@@ -100,8 +100,7 @@ class DHTMessageTRACE_REPLY:
 
         frame += size.to_bytes(2, byteorder='big')
         frame += (504).to_bytes(2, byteorder='big') # 504 is MSG_DHT_TRACE_REPLY
-
-        frame+=key.to_bytes(32, byteorder='big')
+        frame += key.to_bytes(32, byteorder='big')
 
         for hop in hops:
             frame += hop.as_bytes()

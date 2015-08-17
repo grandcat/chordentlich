@@ -7,30 +7,44 @@ class Storage:
     def __init__(self):
         self.data = {}
 
-    def put(self, key, value, timeOfInsert=None):
+    def put(self, key, value, ttl=43200,timeOfInsert=None):
+
         if not timeOfInsert:
             timeOfInsert = datetime.datetime.now()
 
-        self.data[key] = {"value": value, "timeOfInsert": timeOfInsert}
+        if ttl>43200:
+            raise AttributeError("TTL must be below 43200.")
+
+        if not key in self.data: # if there does not exists a item of the given key, we create a new list
+            self.data[key] = []
+
+        self.data[key].append({"value": value, "timeOfInsert": timeOfInsert, "ttl": ttl})
 
     def get(self, key):
-        if not key in self.data:
+        returnValues = []
+        if not key in self.data or len(self.data[key]) == 0:
             return None
-        return self.data[key]["value"]
+        else:
+            for key2, val in enumerate(self.data[key]):
+                returnValues.append( self.data[key][key2]["value"])
+        return returnValues
 
-    def timeDiffOneDay(self, timeStart, timeStop):
+    def timeDiff(self, timeStart, timeStop, ttl):
         diff = timeStop-timeStart
-        if diff >= datetime.timedelta(days=1):
+        if diff >= datetime.timedelta(seconds=ttl):
             return True
         else:
             return False
 
     def clean_old(self):
-        keysToDelete = []
-        for key in self.data:
-            item = self.data[key]
-            if self.timeDiffOneDay(item["timeOfInsert"], datetime.datetime.now()):
-                keysToDelete.append(key)
 
-        for key in keysToDelete:
-            del (self.data[key])
+        for bucketKey in self.data:
+            keysToDelete = []
+            bucket = self.data[bucketKey]
+            for key, val in enumerate(bucket):
+                item = bucket[key]
+                if self.timeDiff(item["timeOfInsert"], datetime.datetime.now(), item["ttl"]):
+                    keysToDelete.append(key)
+
+            for key in keysToDelete:
+                del (self.data[bucketKey][key])
