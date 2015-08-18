@@ -147,7 +147,8 @@ class DHTMessageGET_REPLY:
     :param key: the key as integer
     :param content: the content
     """
-    def __init__(self, key, content ):
+    def __init__(self, key, content):
+        assert type(content) is bytes
 
         frame = bytearray()
 
@@ -157,7 +158,7 @@ class DHTMessageGET_REPLY:
         frame += size.to_bytes(2, byteorder='big')
         frame += (503).to_bytes(2, byteorder='big') # 503 is MSG_DHT_GET?REPLY
         frame += key.to_bytes(32, byteorder='big')
-        frame += (content).to_bytes(len(content), byteorder='big')
+        frame += content
         self.frame = frame
 
     def get_data(self):

@@ -2,7 +2,7 @@ import asyncio
 import base64
 import logging
 import random
-from helpers.messageParser import DHTMessage, DHTMessagePUT, DHTMessageGET
+from helpers.messageParser import DHTMessage, DHTMessagePUT, DHTMessageGET, DHTMessageGET_REPLY
 
 
 class ApiServer(asyncio.Protocol):
@@ -11,6 +11,7 @@ class ApiServer(asyncio.Protocol):
         self.node = dht_node
 
         self.log.info("API server listening.")
+        self.get_id = 0
 
     def connection_made(self, transport):
         self.transport = transport
@@ -28,10 +29,12 @@ class ApiServer(asyncio.Protocol):
         try:
             # api_message = parser.read_binary(message)
             # TEST
-            if message.decode() == "p":
-                api_message = parser.read_file('helpers/test_messages/DHTPUT')
-            else:
+            cmd = message.decode().rstrip()
+            if cmd.isdigit():
                 api_message = parser.read_file('helpers/test_messages/DHTGET')
+                self.get_id = int(cmd)
+            else:
+                api_message = parser.read_file('helpers/test_messages/DHTPUT')
             # TEST END
             asyncio.Task(self.route_api_request(api_message))
 
@@ -72,12 +75,17 @@ class ApiServer(asyncio.Protocol):
     def handle_dht_get(self, api_message):
         assert isinstance(api_message, DHTMessageGET)
 
-        key = random.randint(0, 255)  # api_message.get_key()
+        key = self.get_id  # api_message.get_key()
         print("DHT get key: %d" % key)
 
         dht_result = yield from self.node.get_data(key)
         # TODO: Convert base64 back to bytes
-        print("DHT GET result: %s" % dht_result)
+        for item in dht_result["data"]:
+            data = base64.b64decode(item.encode())
+            print("DHT GET result: %s" % data)
+
+            reply = DHTMessageGET_REPLY(key, data)
+            self.transport.write(reply.get_data())
 
     def test_generate_dht_put(self):
         buffer = bytearray(30)
