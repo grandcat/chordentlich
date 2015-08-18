@@ -11,7 +11,6 @@ class ApiServer(asyncio.Protocol):
         self.node = dht_node
 
         self.log.info("API server listening.")
-        self.get_id = 0
 
     def connection_made(self, transport):
         self.transport = transport
@@ -27,14 +26,14 @@ class ApiServer(asyncio.Protocol):
         parser = DHTMessage()
 
         try:
-            # api_message = parser.read_binary(message)
+            api_message = parser.read_binary(message)
             # TEST
-            cmd = message.decode().rstrip()
-            if cmd.isdigit():
-                api_message = parser.read_file('helpers/test_messages/DHTGET')
-                self.get_id = int(cmd)
-            else:
-                api_message = parser.read_file('helpers/test_messages/DHTPUT')
+            # cmd = message.decode().rstrip()
+            # if cmd.isdigit():
+            #     api_message = parser.read_file('helpers/test_messages/DHTGET')
+            #     self.get_id = int(cmd)
+            # else:
+            #     api_message = parser.read_file('helpers/test_messages/DHTPUT')
             # TEST END
             asyncio.Task(self.route_api_request(api_message))
 
@@ -60,10 +59,10 @@ class ApiServer(asyncio.Protocol):
         assert isinstance(api_message, DHTMessagePUT)
 
         key = random.randint(0, 255)  # api_message.get_key()
+        print("DHT PUT key: %d" % key)
         data = api_message.get_content()
         ttl = api_message.get_ttl()
         replication = api_message.get_replication()
-        print(key)
 
         # Convert byte array to base64 string for JSON compatibility
         # This can be replaced if "aiomas.codecs.MsgPack" is used for peer communication
@@ -75,8 +74,8 @@ class ApiServer(asyncio.Protocol):
     def handle_dht_get(self, api_message):
         assert isinstance(api_message, DHTMessageGET)
 
-        key = self.get_id  # api_message.get_key()
-        print("DHT get key: %d" % key)
+        key = api_message.get_key()
+        print("DHT GET key: %d" % key)
 
         dht_result = yield from self.node.get_data(key)
         # TODO: Convert base64 back to bytes

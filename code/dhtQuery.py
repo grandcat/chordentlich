@@ -44,7 +44,7 @@ while True:
             frame += int(2).to_bytes(1, byteorder='big') # replication
             frame += int(0).to_bytes(1, byteorder='big') # reserved
             frame += int(0).to_bytes(4, byteorder='big') # reserved
-            frame += len(str) # content
+            frame += str # content
 
 
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -52,7 +52,8 @@ while True:
 
             try:
                 sock.connect(server_address)
-                sock.sendall(bytes(json.dumps(message), 'UTF-8'))
+                print("Send to DHT: %s" % frame)
+                sock.sendall(frame)
                 amount_received = 0
                 data_available = 1
 
@@ -63,12 +64,13 @@ while True:
                     amount_received += len(data)
                     output.extend(data)
 
-                size = int.from_bytes( self.data[0:2], byteorder='big')
-                content = message[34:size]
+                size = int.from_bytes(output[0:2], byteorder='big')
+                content = output[34:size]
                 print("Sent STORE command for content: ",content)
 
             except Exception as error:
                 print("Something went wrong. Make sure you can connect to your localhost node on port", port)
+                print(error)
 
             finally:
                 sock.close()
@@ -94,7 +96,7 @@ while True:
 
             try:
                 sock.connect(server_address)
-                sock.sendall(bytes(json.dumps(message), 'UTF-8'))
+                sock.sendall(frame)
                 amount_received = 0
                 data_available = 1
 
@@ -105,8 +107,8 @@ while True:
                     amount_received += len(data)
                     output.extend(data)
 
-                size = int.from_bytes( self.data[0:2], byteorder='big')
-                content = message[34:size].decode("utf-8")
+                size = int.from_bytes(output[0:2], byteorder='big')
+                content = output[34:size].decode("utf-8")
                 print("Returned content is:",content)
 
             except Exception as error:
