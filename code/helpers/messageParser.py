@@ -96,31 +96,31 @@ class DHTMessagePUT(DHTMessageParent):
 
         :rtype: int
         """
-        return  int.from_bytes( self.data[4:12], byteorder='big')
+        return  int.from_bytes( self.data[4:36], byteorder='big')
     def get_ttl(self):
         """
         Returns the time to live (ttl) in seconds
 
         :rtype: int
         """
-        return int.from_bytes( self.data[12:14], byteorder='big')
+        return int.from_bytes( self.data[36:38], byteorder='big')
     def get_replication(self):
         """
         Returns the replication
 
         :rtype: int
         """
-        return int.from_bytes( self.data[14:15], byteorder='big')
+        return int.from_bytes( self.data[38:39], byteorder='big')
     def get_reserved(self):
-        return self.data[15:20]
+        return self.data[39:44]
     def get_content(self):
         """
         Returns the content
 
         :returns: content
-        :rtype: byte[] TODO!!
+        :rtype: bytearray
         """
-        return self.data[20:self.size]
+        return self.data[44:self.size]
 
 class DHTMessageGET(DHTMessageParent):
     def get_key(self):
@@ -129,7 +129,7 @@ class DHTMessageGET(DHTMessageParent):
 
         :rtype: int
         """
-        return  int.from_bytes( self.data[4:12], byteorder='big')
+        return  int.from_bytes( self.data[4:36], byteorder='big')
 
 class DHTMessageTRACE(DHTMessageParent):
     def get_key(self):
@@ -164,7 +164,61 @@ class DHTMessageGET_REPLY:
     def get_data(self):
         return self.frame
 
-class DHTMessageTRACE_REPLY:
+class MAKE_MSG_DHT_GET:
+    """
+    Initializes a MAKE_MSG_DHT_GET message to send later.
+
+    :param key: the key as integer
+    :param hops: a list of :py:meth:`DHTHop` objects
+    """
+    def __init__(self, key):
+
+        size = 40
+        frame = bytearray()
+        frame += size.to_bytes(2, byteorder='big')
+        frame += (501).to_bytes(2, byteorder='big') # 501 is MSG_DHT_GET
+        frame += int(key).to_bytes(32, byteorder='big')
+
+        self.frame = frame
+
+    def get_data(self):
+        return self.frame
+
+class MAKE_MSG_DHT_PUT:
+    """
+    Initializes a MSG_DHT_PUT message to send later.
+
+    :param key: key as integer
+    :type key: int
+    :param content: The content to be stored
+    :type content: bytearray
+    :param ttl: time the content is available in seconds (43200 per default)
+    :type ttl: int
+    :param replication: The amount of replication. A replication degree of three means a tripple redundancy. If one node crashes, there are still two nodes available for example.
+    :type replication: int
+    """
+    def __init__(self, key, content, ttl=43200,replication=3):
+
+        frame = bytearray()
+        size = 44+len(content)
+        frame += size.to_bytes(2, byteorder='big')
+        frame += (500).to_bytes(2, byteorder='big') # 500 is MSG_DHT_PUT
+        frame += int(key).to_bytes(32, byteorder='big')
+        frame += int(ttl).to_bytes(2, byteorder='big')
+        frame += int(replication).to_bytes(1, byteorder='big') # replication
+        frame += int(0).to_bytes(1, byteorder='big') # reserved
+        frame += int(0).to_bytes(4, byteorder='big') # reserved
+        frame += content # content
+
+        self.frame = frame
+    """
+        :returns: Message in binary format
+        :rtype: bytearray
+    """
+    def get_data(self):
+        return self.frame
+
+class MAKE_MSG_DHT_TRACE_REPLY:
     """
     Initializes a DHT_TRACE_REPLY message to send later.
 
