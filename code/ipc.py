@@ -86,8 +86,7 @@ class ApiServer(asyncio.Protocol):
             reply = DHTMessageGET_REPLY(key, data)
             print("array for transport is: ", reply.get_data())
             self.transport.write(reply.get_data())
-        self.transport.close()
-        #self.transport.write_eof()
+        self.transport.write_eof()
 
     def test_generate_dht_put(self):
         buffer = bytearray(30)

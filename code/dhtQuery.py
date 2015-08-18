@@ -32,21 +32,8 @@ while True:
         elif key == "" or val == "":
             print("Key or value missing. Aborting...")
         else:
-            frame = bytearray()
             str =  val.encode("utf-8")
-
-            size = 44+len(str)
-
-            frame += size.to_bytes(2, byteorder='big')
-            frame += (500).to_bytes(2, byteorder='big') # 500 is MSG_DHT_PUT
-            frame += int(key).to_bytes(32, byteorder='big')
-            frame += int(40000).to_bytes(2, byteorder='big')
-            frame += int(2).to_bytes(1, byteorder='big') # replication
-            frame += int(0).to_bytes(1, byteorder='big') # reserved
-            frame += int(0).to_bytes(4, byteorder='big') # reserved
-            frame += str # content
-
-
+            frame = MAKE_MSG_DHT_PUT(key, str).get_data()
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server_address = ('127.0.0.1', port)
 
@@ -54,19 +41,21 @@ while True:
                 sock.connect(server_address)
                 print("Send to DHT: %s" % frame)
                 sock.sendall(frame)
-                amount_received = 0
-                data_available = 1
+                #amount_received = 0
+                #data_available = 1
 
-                output = bytearray()
-                while data_available > 0 and amount_received < 1024:
-                    data = sock.recv(16)
-                    data_available = len(data)
-                    amount_received += len(data)
-                    output.extend(data)
+                # output = bytearray()
+                # while data_available > 0 and amount_received < 1024:
+                #     data = sock.recv(16)
+                #     data_available = len(data)
+                #     amount_received += len(data)
+                #     output.extend(data)
 
-                size = int.from_bytes(output[0:2], byteorder='big')
-                content = output[34:size]
-                print("Sent STORE command for content: ",content)
+                # Parse a DHT_GET_REPLY.
+                #size = int.from_bytes(output[0:2], byteorder='big')
+                # content = output[34:size]
+
+                print("Sent STORE command for content: ",val)
 
             except Exception as error:
                 print("Something went wrong. Make sure you can connect to your localhost node on port", port)
@@ -84,13 +73,7 @@ while True:
         if key == "":
             print("You did not provide a key. It's like entering a house. No key. No access. I am sorry.")
         else:
-            frame = bytearray()
-            size = 40
-
-            frame += size.to_bytes(2, byteorder='big')
-            frame += (501).to_bytes(2, byteorder='big') # 501 is MSG_DHT_GET
-            frame += int(key).to_bytes(32, byteorder='big')
-
+            frame = MAKE_MSG_DHT_GET(key).get_data()
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server_address = ('127.0.0.1', port)
 
@@ -107,13 +90,17 @@ while True:
                     amount_received += len(data)
                     output.extend(data)
 
-                size = int.from_bytes(output[0:2], byteorder='big')
-                content = output[36:size].decode("utf-8")
-                print("Returned content is:",content)
+                offset = 0
+                while amount_received>0:
+                    size = int.from_bytes(output[offset+0:offset+2], byteorder='big')
+                    content = output[offset+36:offset+size].decode("utf-8")
+                    amount_received-= size
+                    offset +=size
+                    print("Returned content is:",content)
 
-            except Exception as error:
-                print (error)
-                print("Something went wrong. Make sure you can connect to your localhost node on port", port)
+            #except Exception as error:
+            #    print (error)
+            #s    print("Something went wrong. Make sure you can connect to your localhost node on port", port)
 
             finally:
                 sock.close()

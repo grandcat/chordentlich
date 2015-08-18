@@ -164,7 +164,61 @@ class DHTMessageGET_REPLY:
     def get_data(self):
         return self.frame
 
-class DHTMessageTRACE_REPLY:
+class MAKE_MSG_DHT_GET:
+    """
+    Initializes a MAKE_MSG_DHT_GET message to send later.
+
+    :param key: the key as integer
+    :param hops: a list of :py:meth:`DHTHop` objects
+    """
+    def __init__(self, key):
+
+        size = 40
+        frame = bytearray()
+        frame += size.to_bytes(2, byteorder='big')
+        frame += (501).to_bytes(2, byteorder='big') # 501 is MSG_DHT_GET
+        frame += int(key).to_bytes(32, byteorder='big')
+
+        self.frame = frame
+
+    def get_data(self):
+        return self.frame
+
+class MAKE_MSG_DHT_PUT:
+    """
+    Initializes a MSG_DHT_PUT message to send later.
+
+    :param key: key as integer
+    :type key: int
+    :param content: The content to be stored
+    :type content: bytearray
+    :param ttl: time the content is available in seconds (43200 per default)
+    :type ttl: int
+    :param replication: The amount of replication. A replication degree of three means a tripple redundancy. If one node crashes, there are still two nodes available for example.
+    :type replication: int
+    """
+    def __init__(self, key, content, ttl=43200,replication=3):
+
+        frame = bytearray()
+        size = 44+len(content)
+        frame += size.to_bytes(2, byteorder='big')
+        frame += (500).to_bytes(2, byteorder='big') # 500 is MSG_DHT_PUT
+        frame += int(key).to_bytes(32, byteorder='big')
+        frame += int(ttl).to_bytes(2, byteorder='big')
+        frame += int(replication).to_bytes(1, byteorder='big') # replication
+        frame += int(0).to_bytes(1, byteorder='big') # reserved
+        frame += int(0).to_bytes(4, byteorder='big') # reserved
+        frame += content # content
+
+        self.frame = frame
+    """
+        :returns: Message in binary format
+        :rtype: bytearray
+    """
+    def get_data(self):
+        return self.frame
+
+class MAKE_MSG_DHT_TRACE_REPLY:
     """
     Initializes a DHT_TRACE_REPLY message to send later.
 
