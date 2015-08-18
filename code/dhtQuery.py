@@ -33,16 +33,19 @@ while True:
             print("Key or value missing. Aborting...")
         else:
             frame = bytearray()
-            size = 22+len(key)
+            str =  val.encode("utf-8")
+
+            size = 22+len(str)
 
             frame += size.to_bytes(2, byteorder='big')
             frame += (500).to_bytes(2, byteorder='big') # 500 is MSG_DHT_GET_REPLY
             frame += int(key).to_bytes(32, byteorder='big')
             frame += int(40000).to_bytes(2, byteorder='big')
             frame += int(2).to_bytes(1, byteorder='big') # replication
-            frame += int(1).to_bytes(1, byteorder='big')
+            frame += int(0).to_bytes(1, byteorder='big') # reserved
+            frame += int(0).to_bytes(4, byteorder='big') # reserved
+            frame += len(str) # content
 
-            frame += val.encode("utf-8")
 
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server_address = ('127.0.0.1', port)

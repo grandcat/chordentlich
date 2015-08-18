@@ -31,7 +31,7 @@
 
   
     <link rel="top" title="Chord DHT 1 documentation" href="index.html"/>
-        <link rel="prev" title="Welcome to Chord DHT’s documentation!" href="index.html"/> 
+        <link rel="prev" title="DHT Chord Module in Python" href="index.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -75,6 +75,10 @@
 <li class="toctree-l2"><a class="reference internal" href="#module-storage"><code class="docutils literal"><span class="pre">storage</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-messageParser"><code class="docutils literal"><span class="pre">messageParser</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-iniParser"><code class="docutils literal"><span class="pre">iniParser</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#tools">Tools</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#dhtquery">dhtQuery</a></li>
 </ul>
 </li>
 </ul>
@@ -233,6 +237,20 @@ multiple entrys per key.</p>
 </dd></dl>
 
 <dl class="method">
+<dt id="messageParser.DHTMessage.read_binary">
+<code class="descname">read_binary</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="headerlink" href="#messageParser.DHTMessage.read_binary" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read and parse binary data</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>data</strong> (<em>bytearray</em>) &#8211; The data</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="messageParser.DHTMessage.read_file">
 <code class="descname">read_file</code><span class="sig-paren">(</span><em>filename</em><span class="sig-paren">)</span><a class="headerlink" href="#messageParser.DHTMessage.read_file" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read a binary file representing a message. The message is automatically parsed
@@ -335,6 +353,16 @@ entry (HOSTKEY), we wrote our own</p>
 
 </div>
 </div>
+<div class="section" id="tools">
+<h1>Tools<a class="headerlink" href="#tools" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="dhtquery">
+<h2>dhtQuery<a class="headerlink" href="#dhtquery" title="Permalink to this headline">¶</a></h2>
+<p>This is a console tool made to put and get data from the DHT.
+You can start and use it with <code class="docutils literal"><span class="pre">./dhtQuery.py</span></code>. Keys need to be
+provided as integers and are converted to big endian. Values are converted
+to strings using utf8 encoding.</p>
+</div>
+</div>
 
 
           </div>
@@ -343,7 +371,7 @@ entry (HOSTKEY), we wrote our own</p>
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
       
-        <a href="index.html" class="btn btn-neutral" title="Welcome to Chord DHT’s documentation!" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="index.html" class="btn btn-neutral" title="DHT Chord Module in Python" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
