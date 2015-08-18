@@ -35,10 +35,10 @@ while True:
             frame = bytearray()
             str =  val.encode("utf-8")
 
-            size = 22+len(str)
+            size = 44+len(str)
 
             frame += size.to_bytes(2, byteorder='big')
-            frame += (500).to_bytes(2, byteorder='big') # 500 is MSG_DHT_GET_REPLY
+            frame += (500).to_bytes(2, byteorder='big') # 500 is MSG_DHT_PUT
             frame += int(key).to_bytes(32, byteorder='big')
             frame += int(40000).to_bytes(2, byteorder='big')
             frame += int(2).to_bytes(1, byteorder='big') # replication
@@ -88,7 +88,7 @@ while True:
             size = 40
 
             frame += size.to_bytes(2, byteorder='big')
-            frame += (501).to_bytes(2, byteorder='big') # 503 is MSG_DHT_GET_REPLY
+            frame += (501).to_bytes(2, byteorder='big') # 501 is MSG_DHT_GET
             frame += int(key).to_bytes(32, byteorder='big')
 
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -108,10 +108,11 @@ while True:
                     output.extend(data)
 
                 size = int.from_bytes(output[0:2], byteorder='big')
-                content = output[34:size].decode("utf-8")
+                content = output[36:size].decode("utf-8")
                 print("Returned content is:",content)
 
             except Exception as error:
+                print (error)
                 print("Something went wrong. Make sure you can connect to your localhost node on port", port)
 
             finally:

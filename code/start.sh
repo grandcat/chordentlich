@@ -2,7 +2,7 @@
 killall python3
 sleep 0.5
 
-count=2
+count=4
 port_start=1337
 
 echo "Start some nodes...."

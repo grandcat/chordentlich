@@ -96,31 +96,31 @@ class DHTMessagePUT(DHTMessageParent):
 
         :rtype: int
         """
-        return  int.from_bytes( self.data[4:12], byteorder='big')
+        return  int.from_bytes( self.data[4:36], byteorder='big')
     def get_ttl(self):
         """
         Returns the time to live (ttl) in seconds
 
         :rtype: int
         """
-        return int.from_bytes( self.data[12:14], byteorder='big')
+        return int.from_bytes( self.data[36:38], byteorder='big')
     def get_replication(self):
         """
         Returns the replication
 
         :rtype: int
         """
-        return int.from_bytes( self.data[14:15], byteorder='big')
+        return int.from_bytes( self.data[38:39], byteorder='big')
     def get_reserved(self):
-        return self.data[15:20]
+        return self.data[39:44]
     def get_content(self):
         """
         Returns the content
 
         :returns: content
-        :rtype: byte[] TODO!!
+        :rtype: bytearray
         """
-        return self.data[20:self.size]
+        return self.data[44:self.size]
 
 class DHTMessageGET(DHTMessageParent):
     def get_key(self):
@@ -129,7 +129,7 @@ class DHTMessageGET(DHTMessageParent):
 
         :rtype: int
         """
-        return  int.from_bytes( self.data[4:12], byteorder='big')
+        return  int.from_bytes( self.data[4:36], byteorder='big')
 
 class DHTMessageTRACE(DHTMessageParent):
     def get_key(self):
