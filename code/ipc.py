@@ -26,7 +26,7 @@ class ApiServer(asyncio.Protocol):
         parser = DHTMessage()
 
         try:
-            # api_message = parser.read(message)
+            # api_message = parser.read_binary(message)
             # TEST
             api_message = parser.read_file('helpers/test_messages/DHTPUT')
             # TEST END

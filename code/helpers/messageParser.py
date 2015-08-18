@@ -33,11 +33,6 @@ class DHTMessage():
     def __init__(self):
         self.message = None
 
-    def read(self, data_in):
-        """Reads a binary input message.
-        """
-        self.data = data_in
-        return self.parse()
 
     def read_file(self, filename):
         """Read a binary file representing a message. The message is automatically parsed
@@ -57,7 +52,7 @@ class DHTMessage():
         :type data: bytearray
         """
         self.data = data
-        self.parse()
+        return self.parse()
 
     def parse(self):
         """
