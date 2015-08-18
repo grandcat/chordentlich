@@ -1,9 +1,9 @@
 DHT Chord Module in Python
 =====================================
 
-Chord is a distributed hash table as described in Ion
+Chord is a distributed hash table as described by Ion
 Stoica et al. in this  `paper`_. We provide a implementation in Python
-developed for the course `P2P Network Security <http://www.net.in.tum.de/de/lehre/ss09/vorlesungen/vorlesung-peer-to-peer-systeme-und-sicherheit/>`_ at TU Munich.
+developed for the course `P2P Network Security <http://www.net.in.tum.de/de/lehre/ss15/vorlesungen/vorlesung-peer-to-peer-systeme/>`_ at TU Munich.
 
 
 .. _paper: http://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf

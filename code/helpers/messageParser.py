@@ -1,4 +1,4 @@
-#!/usr/bin/python3    pass
+#!/usr/bin/python3
 
 """
 The message parser parses and generates binary messages to communicate with other modules like the KX module.
@@ -16,6 +16,7 @@ DHTCommands = {
     505: "MSG_DHT_ERROR"
 }
 
+# the inverse dict, unfortunately python does not have a built in function to solve it another way
 DHTCommandsInv = {
     "MSG_DHT_PUT":  500,
     "MSG_DHT_GET": 501,
@@ -32,11 +33,6 @@ class DHTMessage():
     def __init__(self):
         self.message = None
 
-    def read(self, data_in):
-        """Reads a binary input message.
-        """
-        self.data = data_in
-        return self.parse()
 
     def read_file(self, filename):
         """Read a binary file representing a message. The message is automatically parsed
@@ -47,6 +43,15 @@ class DHTMessage():
         with open(filename, "rb") as f:
             self.data = f.read()
 
+        return self.parse()
+
+    def read_binary(self, data):
+        """Read and parse binary data
+
+        :param data: The data
+        :type data: bytearray
+        """
+        self.data = data
         return self.parse()
 
     def parse(self):
