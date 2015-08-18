@@ -1,9 +1,11 @@
 #!/usr/bin/python3
 import asyncio
 import random
+import traceback
 import aiomas
 import hashlib
 import logging
+import errno
 
 from helpers.storage import Storage
 
@@ -67,6 +69,7 @@ class Node(aiomas.Agent):
         self.log.info("Node server listening on %s.", node_address)
         # Node state
         self.activated = True
+        self.network_timeout = 10
         self.fix_interval = 7 + random.randint(0, 10)
         self.storage = Storage()
         # Overlay network info
@@ -272,14 +275,18 @@ class Node(aiomas.Agent):
             should be None only for periodic fix ups.
             In this case, the predecessor of our old successor is accepted as our new successor.
         """
-        periodic_fix = False
-
-        # TODO: DoS possible here?
         old_successor = self.fingertable[0]["successor"]
-        peer = yield from self.container.connect(old_successor["node_address"])
-        old_successor_view = yield from peer.rpc_get_node_info()  # TODO: validation + timeout catch
+        # Check: DoS possible here?
+        # TODO: validation + timeout catch
+        old_successor_view, peer_err = yield from self.run_rpc_safe(old_successor["node_address"],
+                                                                    "rpc_get_node_info")
+        if peer_err != 0:
+            # Immediate successor is not responding
+            self.log.warn("Immediate successor %s not responding.", old_successor)
+            return  # TODO: better error handling
 
-        # For periodic checks assume that our original successor knows better
+        # For periodic checks assume that our current immediate successor knows better
+        periodic_fix = False
         if new_node is None:
             new_node = old_successor_view["predecessor"]
             periodic_fix = True
@@ -321,7 +328,6 @@ class Node(aiomas.Agent):
             raise IndexError("No valid finger ID.")
 
         cur_finger = self.fingertable[finger_id]
-        # next_finger = self.fingertable[(finger_id + 1) % CHORD_FINGER_TABLE_SIZE]
         successor = yield from self.find_successor(cur_finger["start"])
         print("For start %d, successor is '%s'" % (cur_finger["start"], successor))
 
@@ -384,6 +390,11 @@ class Node(aiomas.Agent):
     def get_closest_preceding_finger(self, node_id):
         """
         Find closest preceding finger within m -> 0 fingers.
+        This method tries falling back to a less optimal peer if the intended peer from
+        the finger table does not respond within ``network_timeout`.
+
+        As the finger table only contains elementary information about a possible successor peer,
+        the resulting peer is requested for more details (e.g., its successor and predecessor).
 
         :param node_id:
             node ID as an integer.
@@ -398,8 +409,9 @@ class Node(aiomas.Agent):
 
             if in_interval(finger_successor["node_id"], self.id, node_id):
                 # Augment node with infos about its successor (and its predecessor)
-                peer = yield from self.container.connect(finger_successor["node_address"])
-                finger_successor = yield from peer.rpc_get_node_info()  # TODO: validation
+                # TODO: validation
+                finger_successor, status = yield from self.run_rpc_safe(finger_successor["node_address"],
+                                                                        "rpc_get_node_info")
                 return finger_successor
 
         return self.as_dict(serialize_neighbors=True)
@@ -453,6 +465,43 @@ class Node(aiomas.Agent):
 
     ##########################################################################
     ### RPC wrappers and functions for maintaining Chord's network overlay ###
+    @asyncio.coroutine
+    def run_rpc_safe(self, remote_address, func_name, *args):
+        data = None
+        err = 1
+        try:
+            #print("Before container.connect()")
+            fut_peer = self.container.connect(remote_address)
+            remote_peer = yield from asyncio.wait_for(fut_peer, timeout=self.network_timeout)
+            #print("After connect()")
+            # Invoke remote function
+            data = yield from getattr(remote_peer, func_name, *args)()
+            err = 0
+
+        except (asyncio.TimeoutError, asyncio.CancelledError) as e:
+            err = errno.ETIMEDOUT
+            self.log.warn("AsyncIO error: connection timed out to remote peer %s", remote_address)
+
+        except TimeoutError:
+            err = errno.ETIMEDOUT
+            self.log.warn("Connection timed out to remote peer %s", remote_address)
+
+        except ConnectionRefusedError:
+            err = errno.ECONNREFUSED
+            self.log.warn("Connection refused by remote peer %s", remote_address)
+
+        except ConnectionError:
+            # Base for connection related issues
+            err = errno.ECOMM
+            self.log.warn("Error connecting to %s", remote_address)
+
+        except Exception:
+            err = 1
+            self.log.warn("Unhandled error during RPC to %s", remote_address)
+            traceback.print_exc()
+
+        return data, err
+
     @aiomas.expose
     def rpc_get_node_info(self):
         return self.as_dict(serialize_neighbors=True)
