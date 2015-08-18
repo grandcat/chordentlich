@@ -58,7 +58,7 @@ class ApiServer(asyncio.Protocol):
     def handle_dht_put(self, api_message):
         assert isinstance(api_message, DHTMessagePUT)
 
-        key = random.randint(0, 255)  # api_message.get_key()
+        key = api_message.get_key()
         print("DHT PUT key: %d" % key)
         data = api_message.get_content()
         ttl = api_message.get_ttl()
