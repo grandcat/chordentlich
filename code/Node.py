@@ -70,10 +70,11 @@ class Node(aiomas.Agent):
         # Node state
         self.activated = True
         self.network_timeout = 10
-        self.fix_interval = 7 + random.randint(0, 10)
         self.storage = Storage()
-        # Overlay network info
+        # Overlay network
         self.fingertable = []
+        self.fix_interval = 7 + random.randint(0, 10)
+        self.fix_next = 0
 
     def as_dict(self, serialize_neighbors=False):
         dict_node = {
@@ -442,9 +443,9 @@ class Node(aiomas.Agent):
 
             # Assure that successor still references us as immediate predecessor
             yield from self.update_successor()
-            # Do random updates on the finger table
-            finger = random.randint(0, CHORD_FINGER_TABLE_SIZE - 1)  # better to use pseudo rnd: every finger once first
-            yield from self.fix_finger(finger)
+            # Update fingers 1 -> m one after each other (finger[0] managed by update_successor)
+            self.fix_next = max(1, (self.fix_next + 1) % CHORD_FINGER_TABLE_SIZE)
+            yield from self.fix_finger(self.fix_next)
 
             print("Current finger table:")
             self.print_finger_table()
