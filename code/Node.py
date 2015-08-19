@@ -1,9 +1,11 @@
 #!/usr/bin/python3
 import asyncio
 import random
+import traceback
 import aiomas
 import hashlib
 import logging
+import errno
 
 from helpers.storage import Storage
 
@@ -67,10 +69,12 @@ class Node(aiomas.Agent):
         self.log.info("Node server listening on %s.", node_address)
         # Node state
         self.activated = True
-        self.fix_interval = 7 + random.randint(0, 10)
+        self.network_timeout = 10
         self.storage = Storage()
-        # Overlay network info
+        # Overlay network
         self.fingertable = []
+        self.fix_interval = 7 + random.randint(0, 10)
+        self.fix_next = 0
 
     def as_dict(self, serialize_neighbors=False):
         dict_node = {
@@ -139,18 +143,6 @@ class Node(aiomas.Agent):
             ft =  yield from remote_peer.rpc_get_fingertable()
             print("Bootstrap Finger Table: ")
             self.print_finger_table(ft)
-
-    @asyncio.coroutine
-    def update_others(self):
-        """
-        Update peers' finger table that should refer to our node and notify them.
-        """
-        for k in range(0, CHORD_FINGER_TABLE_SIZE):
-            p = yield from self.find_predecessor((self.id - 2**k) % CHORD_RING_SIZE)
-            self.log.info("Update peer: %s", p)
-            if self.id != p["node_id"]:
-                remote_peer = yield from self.container.connect(p["node_address"])
-                yield from remote_peer.rpc_update_finger_table(self.as_dict(), k)
 
     @asyncio.coroutine
     def init_finger_table(self):
@@ -225,18 +217,24 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def update_finger_table(self, origin_node, i):
-        if in_interval(origin_node["node_id"], self.id, self.fingertable[i]["successor"]["node_id"], inclusive_left=True):
+        # Do not include self.id in contrast to original paper to abort the recursive call if starting
+        # node tries to update itself
+        if in_interval(origin_node["node_id"], self.id, self.fingertable[i]["successor"]["node_id"]):
             self.log.info("For finger %d: origin_node is %s; successor was %s",
                           i, origin_node, self.fingertable[i]["successor"]["node_id"])
 
             self.fingertable[i]["successor"] = origin_node
-            # Bug: this recursive call causes wrong finger tables. The original paper seems to be incorrect here.
-            # remote_peer = yield from self.container.connect(self.predecessor["node_address"])
-            # yield from remote_peer.rpc_update_finger_table(origin_node, i)
+            # Only forward to predecessor if it is not the peer that started this update cascade
+            if self.predecessor["node_id"] != origin_node["node_id"]:
+                yield from self.run_rpc_safe(self.predecessor["node_address"],
+                                             "rpc_update_finger_table", origin_node, i)
+                #remote_peer = yield from self.container.connect(self.predecessor["node_address"])
+                #yield from remote_peer.rpc_update_finger_table(origin_node, i)
 
     @asyncio.coroutine
     def update_neighbors(self, successor):
-        """
+        """ Update immediate neighbors.
+
         Update our successor's pointer to reference us as immediate predecessor
         (according to default Chord specification).
         Notify our direct predecessor about our presence. This allows to early stabilize
@@ -265,21 +263,35 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def update_successor(self, new_node=None):
-        """
-        Updates the reference to our immediate successor.
+        """Updates the reference to our immediate successor during periodic maintenance or
+        triggered by other peer's hint.
+
+        There are two different cases when this function is triggered:
+        -   A neighboring successor uses this function to notify us about its presence. This ensures
+            that the Chord ring is correct.
+            The parameter ``new_node`` gives a hint about the new successor in this case. To verify
+            this hint, this node contacts its old successor.
+        -
 
         :param new_node:
             should be None only for periodic fix ups.
             In this case, the predecessor of our old successor is accepted as our new successor.
         """
-        periodic_fix = False
-
-        # TODO: DoS possible here?
         old_successor = self.fingertable[0]["successor"]
-        peer = yield from self.container.connect(old_successor["node_address"])
-        old_successor_view = yield from peer.rpc_get_node_info()  # TODO: validation + timeout catch
+        if old_successor["node_id"] == self.id and new_node is None:
+            # No other peers yet in the network -> no maintenance possible
+            return
+        # Check: DoS possible here?
+        # TODO: validation + timeout catch
+        old_successor_view, peer_err = yield from self.run_rpc_safe(old_successor["node_address"],
+                                                                    "rpc_get_node_info")
+        if peer_err != 0:
+            # Immediate successor is not responding
+            self.log.warn("Immediate successor %s not responding.", old_successor)
+            return  # TODO: better error handling
 
-        # For periodic checks assume that our original successor knows better
+        # For periodic checks assume that our current immediate successor knows better
+        periodic_fix = False
         if new_node is None:
             new_node = old_successor_view["predecessor"]
             periodic_fix = True
@@ -309,6 +321,25 @@ class Node(aiomas.Agent):
                                old_successor["node_id"], old_successor["node_address"])
 
     @asyncio.coroutine
+    def update_others(self):
+        """Update peers' finger table that should refer to our node and notify them.
+        """
+        for k in range(0, CHORD_FINGER_TABLE_SIZE):
+            id = (self.id - 2**k) % CHORD_RING_SIZE
+            #p = yield from self.find_predecessor(id)
+            successor = yield from self.find_successor(id)
+            p = successor["predecessor"]
+            # In rare cases with id exactly matching the node's key, successor is more correct
+            # Ex: 116 is looking for node 114 (finger 2), predecessor would be node 249 with successor 114
+            #     In this case, finger in node 114 should be changed, too.
+            #if p["successor"]["node_id"] == id:
+            #    p = p["successor"]
+            self.log.info("Update peer: %s", p)
+            if self.id != p["node_id"]:
+                remote_peer = yield from self.container.connect(p["node_address"])
+                yield from remote_peer.rpc_update_finger_table(self.as_dict(), k)
+
+    @asyncio.coroutine
     def fix_finger(self, finger_id=-1):
         """
         Resolves the responsible node for the given finger and updates it accordingly.
@@ -321,7 +352,6 @@ class Node(aiomas.Agent):
             raise IndexError("No valid finger ID.")
 
         cur_finger = self.fingertable[finger_id]
-        # next_finger = self.fingertable[(finger_id + 1) % CHORD_FINGER_TABLE_SIZE]
         successor = yield from self.find_successor(cur_finger["start"])
         print("For start %d, successor is '%s'" % (cur_finger["start"], successor))
 
@@ -335,17 +365,49 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def find_successor(self, node_id):
+        """Recursive find successor
+
+        :param node_id:
+        :return:
+        """
         successor = self.fingertable[0]["successor"]
         if in_interval(node_id, self.id, successor["node_id"], inclusive_right=True):
-            return successor
+            # Augment node with infos about its successor (and its predecessor)
+            # This also allows to check whether this node is still alive
+            # TODO: validation
+            successor_details, status = yield from self.run_rpc_safe(successor["node_address"],
+                                                                     "rpc_get_node_info")
+            return successor_details
         else:
-            node = yield from self.find_predecessor(node_id)
-            print("[find_successor] Calculated node for %d: %s" % (node_id, node))
-            return node["successor"]  # Attention: relies on available successor information which has to be
-                                      # retrieved by closest_preceding_finger()
+            next_node = yield from self.get_closest_preceding_finger(node_id)
+            print("[find_successor] Closest finger node for %d: %s" % (node_id, next_node))
+
+            peer_data, status = yield from self.run_rpc_safe(next_node["node_address"],
+                                                             "rpc_find_successor", node_id)
+            print("[find_successor] Remote result for id %d: %s" % (node_id, peer_data))
+
+            return peer_data
+
+    # @asyncio.coroutine
+    # def find_successor(self, node_id):
+    #     """ Iterative find successor
+    #
+    #     :param node_id:
+    #     :return:
+    #     """
+    #     successor = self.fingertable[0]["successor"]
+    #     if in_interval(node_id, self.id, successor["node_id"], inclusive_right=True):
+    #         return successor
+    #     else:
+    #         node = yield from self.find_predecessor(node_id)
+    #         print("[find_successor] Calculated node for %d: %s" % (node_id, node))
+    #         return node["successor"]  # Attention: relies on available successor information which has to be
+    #                                   # retrieved by closest_preceding_finger()
 
     @asyncio.coroutine
     def find_predecessor(self, node_id):
+        """DEPRECATED: only used for iterative find_successor
+        """
         selected_node = self.as_dict(serialize_neighbors=True)
         previous_selected_node = None
 
@@ -384,6 +446,11 @@ class Node(aiomas.Agent):
     def get_closest_preceding_finger(self, node_id):
         """
         Find closest preceding finger within m -> 0 fingers.
+        This method tries falling back to a less optimal peer if the intended peer from
+        the finger table does not respond within ``network_timeout`.
+
+        As the finger table only contains elementary information about a possible successor peer,
+        the resulting peer is requested for more details (e.g., its successor and predecessor).
 
         :param node_id:
             node ID as an integer.
@@ -398,11 +465,11 @@ class Node(aiomas.Agent):
 
             if in_interval(finger_successor["node_id"], self.id, node_id):
                 # Augment node with infos about its successor (and its predecessor)
-                peer = yield from self.container.connect(finger_successor["node_address"])
-                finger_successor = yield from peer.rpc_get_node_info()  # TODO: validation
+                #finger_successor, status = yield from self.run_rpc_safe(finger_successor["node_address"],
+                #                                                        "rpc_get_node_info")
                 return finger_successor
 
-        return self.as_dict(serialize_neighbors=True)
+        return self.as_dict()
 
     @asyncio.coroutine
     def stabilize(self):
@@ -412,9 +479,9 @@ class Node(aiomas.Agent):
 
             # Assure that successor still references us as immediate predecessor
             yield from self.update_successor()
-            # Do random updates on the finger table
-            finger = random.randint(0, CHORD_FINGER_TABLE_SIZE - 1)  # better to use pseudo rnd: every finger once first
-            yield from self.fix_finger(finger)
+            # Update fingers 1 -> m one after each other (finger[0] managed by update_successor)
+            self.fix_next = max(1, (self.fix_next + 1) % CHORD_FINGER_TABLE_SIZE)
+            yield from self.fix_finger(self.fix_next)
 
             print("Current finger table:")
             self.print_finger_table()
@@ -453,6 +520,43 @@ class Node(aiomas.Agent):
 
     ##########################################################################
     ### RPC wrappers and functions for maintaining Chord's network overlay ###
+    @asyncio.coroutine
+    def run_rpc_safe(self, remote_address, func_name, *args, **kwargs):
+        data = None
+        err = 1
+        try:
+            #print("Before container.connect()")
+            fut_peer = self.container.connect(remote_address)
+            remote_peer = yield from asyncio.wait_for(fut_peer, timeout=self.network_timeout)
+            #print("After connect()")
+            # Invoke remote function
+            data = yield from getattr(remote_peer, func_name)(*args, **kwargs)
+            err = 0
+
+        except (asyncio.TimeoutError, asyncio.CancelledError) as e:
+            err = errno.ETIMEDOUT
+            self.log.warn("AsyncIO error: connection timed out to remote peer %s", remote_address)
+
+        except TimeoutError:
+            err = errno.ETIMEDOUT
+            self.log.warn("Connection timed out to remote peer %s", remote_address)
+
+        except ConnectionRefusedError:
+            err = errno.ECONNREFUSED
+            self.log.warn("Connection refused by remote peer %s", remote_address)
+
+        except ConnectionError:
+            # Base for connection related issues
+            err = errno.ECOMM
+            self.log.warn("Error connecting to %s", remote_address)
+
+        except Exception:
+            err = 1
+            self.log.error("Unhandled error during RPC to %s", remote_address)
+            traceback.print_exc()
+
+        return data, err
+
     @aiomas.expose
     def rpc_get_node_info(self):
         return self.as_dict(serialize_neighbors=True)
