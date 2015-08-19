@@ -21,7 +21,11 @@ class Replica:
     :rtype: int
     """
     def get_key(self, key, replicaIndex=1):
-        return int(hashlib.sha256(key+replicaIndex.to_bytes(1, byteorder='big')).hexdigest(), 16) % self.chordRingSize
+
+        if replicaIndex>0:
+            key = self.get_key(key, replicaIndex-1)
+
+        return int(hashlib.sha256(key.to_bytes(32, byteorder='big')).hexdigest(), 16) % self.chordRingSize
 
     """Get a list of replica keys for a given replica key
 
@@ -32,7 +36,7 @@ class Replica:
     """
     def get_key_list(self, key, replicationCount):
         indices = []
-        for i in range(0, replicationCount):
+        for i in range(0, replicationCount): 
             indices.append(self.get_key(key, i))
 
         return indices

@@ -10,10 +10,16 @@ class TestIniParser(unittest.TestCase):
 
   def test_property_get(self):
         replica = Replica(10000)
-        k1 = replica.get_key("lorem".encode(), 1)
-        k2 = replica.get_key("lorem".encode(), 4)
-        self.assertEqual(len(replica.get_key_list("1".encode(), 3)), 3)
+
+        k1 = replica.get_key(51, 1)
+        k2 = replica.get_key(23, 2)
+
+        print ("Testing Replica Key. Example key for replicatin 2 is",k2)
+        print("Key list is")
+        print(replica.get_key_list(123,6))
+
+        self.assertEqual(len(replica.get_key_list(8, 3)), 3)
         self.assertNotEqual(k1, k2) # keys do not collide hopefully at a ring size of 10000
-        self.assertEqual(k1, 7393)
+        self.assertEqual(k1, 7195)
 if __name__ == '__main__':
     unittest.main()

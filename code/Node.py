@@ -534,35 +534,64 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def put_data(self, key, data, ttl, replicationCount=3):
-        storage_node = yield from self.find_successor(key)
-        print("Found successor for storage: ", storage_node)
+        replica = Replica(CHORD_RING_SIZE)
 
-        if storage_node["node_id"] == self.id:
-            self.storage.put(key, data, ttl=ttl)
+        keys = replica.get_key_list(key, replicationCount)
+
+        print(keys) # [197, 210, 70]
+        successes = 0
+        for keyWithReplicaIndex in keys:
+            storage_node = yield from self.find_successor(keyWithReplicaIndex)
+            print("Found successor for storage: ", storage_node)
+
+            if storage_node["node_id"] == self.id:
+                self.storage.put(keyWithReplicaIndex, data, ttl=ttl)
+                successes += 1
+            else:
+                # Directly connect to remote peer and store it there
+                peer = yield from self.container.connect(storage_node["node_address"])
+                result = yield from peer.rpc_dht_put_data(keyWithReplicaIndex, data, ttl=ttl)  # TODO: validate
+                if result == 0:
+                    successes += 1
+                else:
+                    pass # TODO: FAIL MESSAGE
+
+
+        if successes >= 1:
             return {
-                "status": 0
+                "status": 0,
+                "successes" : successes
             }
         else:
-            # Directly connect to remote peer and store it there
-            peer = yield from self.container.connect(storage_node["node_address"])
-            result = yield from peer.rpc_dht_put_data(key, data, ttl=ttl)  # TODO: validate
-            return result
+            return {
+                "status": 0,
+                "successes" : successes,
+                "messages" : "Data could not be saved."
+            }
 
     @asyncio.coroutine
     def get_data(self, key):
-        storage_node = yield from self.find_successor(key)
+        replica = Replica(CHORD_RING_SIZE)
+        keys = replica.get_key_list(key, 5) # 5 is the replications that are tried before abort
 
-        if storage_node["node_id"] == self.id:
-            return {
-                "status": 0,
-                "data": self.storage.get(key)
-            }
-        else:
-            # Directly connect to remote peer and fetch data from there
-            peer = yield from self.container.connect(storage_node["node_address"])
-            result = yield from peer.rpc_dht_get_data(key)  # TODO: validate
-            return result
 
+        for keyWithReplicaIndex in keys:
+            storage_node = yield from self.find_successor(keyWithReplicaIndex)
+            if storage_node["node_id"] == self.id:
+                print("RETURN KEYDATA FOR KEY"+str(keyWithReplicaIndex)+":", str(self.storage.get(keyWithReplicaIndex)))
+                return {
+                    "status": 0,
+                    "data": self.storage.get(keyWithReplicaIndex)
+                }
+
+            else:
+                # Directly connect to remote peer and fetch data from there
+                peer = yield from self.container.connect(storage_node["node_address"])
+                result = yield from peer.rpc_dht_get_data(keyWithReplicaIndex)  # TODO: validate
+                if result == 0:
+                    return result
+
+        return {"status": 1}
     ##########################################################################
     ### RPC wrappers and functions for maintaining Chord's network overlay ###
     @asyncio.coroutine
