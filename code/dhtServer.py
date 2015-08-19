@@ -118,7 +118,7 @@ class DHTAsyncServer(asyncio.Protocol):
             message = {
                 "action": "FIND_SUCCESSOR",
                 "key": self.get_keytemp(self.node.host_address, self.node.host_port),
-                "newpredecessor": self.get_key(), # The predecessor must be updated in the initial bootstrap find_successor
+                "newpredecessor": self.get_key(), # The predecessor must be updated in the initial bootstrap find_successor_rec
                 "destination_port": self.node.bootstrap_port,
                 "destination_ip" : "127.0.0.1",
                 "source_port": self.node.host_port,
