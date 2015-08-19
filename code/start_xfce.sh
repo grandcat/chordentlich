@@ -2,7 +2,7 @@
 killall python3
 sleep 0.5
 
-count=4
+count=5
 startport=1338
 
 xfce4-terminal -H -x  python3 main.py -i 1337

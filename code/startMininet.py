@@ -20,11 +20,14 @@ def test():
 
     net.start()
 
-    hosts[0].cmd('xterm -e python3 -u main.py -I %s &' % hosts[0].IP())
+    hosts[0].cmd('xterm -geometry 130x40+0+900 -e  python3 -u main.py -I %s &' % hosts[0].IP())
 
     for host in hosts[1:]:
         time.sleep(1)
-        host.cmd('xterm -e python3 -u main.py -I %s -B %s &' % (host.IP(), hosts[0].IP()))
+        host.cmd('xterm -geometry 130x40+0+900 -e python3 -u main.py -I %s -B %s &' % (host.IP(), hosts[0].IP()))
+
+    raw_input('Press enter to stop all nodes.')
+    net.stop()
 
 if __name__ == '__main__':
     # Tell mininet to print useful information
