@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Helpers &mdash; Chord DHT 1 documentation</title>
+  <title>Chord Node &mdash; Chord DHT 1 documentation</title>
   
 
   
@@ -71,7 +71,11 @@
           
           
               <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="">Helpers</a><ul>
+<li class="toctree-l1 current"><a class="current reference internal" href="">Chord Node</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-Node"><code class="docutils literal"><span class="pre">Node</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#helpers">Helpers</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#module-storage"><code class="docutils literal"><span class="pre">storage</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-messageParser"><code class="docutils literal"><span class="pre">messageParser</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-iniParser"><code class="docutils literal"><span class="pre">iniParser</span></code></a></li>
@@ -105,7 +109,7 @@
   <ul class="wy-breadcrumbs">
     <li><a href="index.html">Docs</a> &raquo;</li>
       
-    <li>Helpers</li>
+    <li>Chord Node</li>
       <li class="wy-breadcrumbs-aside">
         
           
@@ -118,7 +122,162 @@
 </div>
           <div role="main" class="document">
             
-  <div class="section" id="helpers">
+  <div class="section" id="module-Node">
+<span id="chord-node"></span><h1>Chord Node<a class="headerlink" href="#module-Node" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="module-Node">
+<span id="node"></span><h2><a class="reference internal" href="#module-Node" title="Node"><code class="xref py py-mod docutils literal"><span class="pre">Node</span></code></a><a class="headerlink" href="#module-Node" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="Node.Node">
+<em class="property">class </em><code class="descclassname">Node.</code><code class="descname">Node</code><span class="sig-paren">(</span><em>container</em>, <em>node_address</em><span class="sig-paren">)</span><a class="headerlink" href="#Node.Node" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="Node.Node.find_predecessor">
+<code class="descname">find_predecessor</code><span class="sig-paren">(</span><em>node_id</em><span class="sig-paren">)</span><a class="headerlink" href="#Node.Node.find_predecessor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Find predecessor</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">Deprecated: use <a class="reference internal" href="#Node.Node.find_successor" title="Node.Node.find_successor"><code class="xref py py-func docutils literal"><span class="pre">find_successor()</span></code></a> instead. It also contains a reference to the node&#8217;s predecessor.</p>
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="Node.Node.find_successor">
+<code class="descname">find_successor</code><span class="sig-paren">(</span><em>node_id</em><span class="sig-paren">)</span><a class="headerlink" href="#Node.Node.find_successor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Recursive find successor</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>node_id</strong> &#8211; </td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="Node.Node.fix_finger">
+<code class="descname">fix_finger</code><span class="sig-paren">(</span><em>finger_id=-1</em><span class="sig-paren">)</span><a class="headerlink" href="#Node.Node.fix_finger" title="Permalink to this definition">¶</a></dt>
+<dd><p>Resolves the responsible node for the given finger and updates it accordingly.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>finger_id</strong> &#8211; index of the finger table to update.
+The value should be between 0 and length of the finger table.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="Node.Node.fix_successor">
+<code class="descname">fix_successor</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#Node.Node.fix_successor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Periodically fixes this node&#8217;s immediate successor.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="Node.Node.get_closest_preceding_finger">
+<code class="descname">get_closest_preceding_finger</code><span class="sig-paren">(</span><em>node_id</em><span class="sig-paren">)</span><a class="headerlink" href="#Node.Node.get_closest_preceding_finger" title="Permalink to this definition">¶</a></dt>
+<dd><p>Find closest preceding finger within m -&gt; 0 fingers.
+This method tries falling back to a less optimal peer if the intended peer from
+the finger table does not respond within <code class="docutils literal"><span class="pre">network_timeout</span></code>.</p>
+<p>As the finger table only contains elementary information about a possible successor peer,
+the resulting peer is requested for more details (e.g., its successor and predecessor).</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>node_id</strong> &#8211; node ID as an integer.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">returns the interesting node descriptor as a dictionary with successor and predecessor.</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">dict</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="Node.Node.join">
+<code class="descname">join</code><span class="sig-paren">(</span><em>node_id=None</em>, <em>node_address=None</em>, <em>bootstrap_address=None</em><span class="sig-paren">)</span><a class="headerlink" href="#Node.Node.join" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set ups all internal state variables needed for operation.
+Needs to be called previously to any other function or RPC call.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>node_id</strong> &#8211; optional node ID.
+If not supplied, it will be generated automatically.</li>
+<li><strong>node_address</strong> &#8211; optional node address formatted as an aiomas agent address (IPv4 or IPv6 address)</li>
+<li><strong>bootstrap_address</strong> &#8211; if not given, a new Chord network is created. Otherwise, the new node
+will gather the required information to integrate into the Chord network.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="Node.Node.update_neighbors">
+<code class="descname">update_neighbors</code><span class="sig-paren">(</span><em>successor</em><span class="sig-paren">)</span><a class="headerlink" href="#Node.Node.update_neighbors" title="Permalink to this definition">¶</a></dt>
+<dd><p>Update immediate neighbors.</p>
+<p>Update our successor&#8217;s pointer to reference us as immediate predecessor
+(according to default Chord specification).
+Notify our direct predecessor about our presence. This allows to early stabilize
+its immediate successor finger[0] early.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>successor</strong> &#8211; the immediate successor of this node (e.g., according to a bootstrap node).</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="Node.Node.update_others">
+<code class="descname">update_others</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#Node.Node.update_others" title="Permalink to this definition">¶</a></dt>
+<dd><p>Update peers&#8217; finger table that should refer to our node and notify them.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="Node.Node.update_successor">
+<code class="descname">update_successor</code><span class="sig-paren">(</span><em>new_node=None</em><span class="sig-paren">)</span><a class="headerlink" href="#Node.Node.update_successor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the reference to our immediate successor during periodic maintenance or
+triggered by other peer&#8217;s hint.</p>
+<p>There are two different cases when this function is triggered:</p>
+<ul class="simple">
+<li>A neighboring successor uses this function to notify us about its presence. This ensures
+that the Chord ring is correct.
+The parameter <code class="docutils literal"><span class="pre">new_node</span></code> gives a hint about the new successor in this case. To verify
+this hint, this node contacts its old successor.</li>
+</ul>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>new_node</strong> &#8211; should be None only for periodic fix ups.
+In this case, the predecessor of our old successor is accepted as our new successor.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="Node.in_interval">
+<code class="descclassname">Node.</code><code class="descname">in_interval</code><span class="sig-paren">(</span><em>search_id</em>, <em>node_left</em>, <em>node_right</em>, <em>inclusive_left=False</em>, <em>inclusive_right=False</em><span class="sig-paren">)</span><a class="headerlink" href="#Node.in_interval" title="Permalink to this definition">¶</a></dt>
+<dd><p>Interval checks.</p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="helpers">
 <h1>Helpers<a class="headerlink" href="#helpers" title="Permalink to this headline">¶</a></h1>
 <p>Helpers are various classes to support the DHT operations</p>
 <span class="target" id="module-storage"></span><div class="section" id="module-storage">
@@ -286,8 +445,46 @@ afterwards.</p>
 </dd></dl>
 
 <dl class="class">
-<dt id="messageParser.DHTMessageTRACE_REPLY">
-<em class="property">class </em><code class="descclassname">messageParser.</code><code class="descname">DHTMessageTRACE_REPLY</code><span class="sig-paren">(</span><em>key</em>, <em>hops</em><span class="sig-paren">)</span><a class="headerlink" href="#messageParser.DHTMessageTRACE_REPLY" title="Permalink to this definition">¶</a></dt>
+<dt id="messageParser.MAKE_MSG_DHT_GET">
+<em class="property">class </em><code class="descclassname">messageParser.</code><code class="descname">MAKE_MSG_DHT_GET</code><span class="sig-paren">(</span><em>key</em><span class="sig-paren">)</span><a class="headerlink" href="#messageParser.MAKE_MSG_DHT_GET" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a MAKE_MSG_DHT_GET message to send later.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>key</strong> &#8211; the key as integer</li>
+<li><strong>hops</strong> &#8211; a list of <a class="reference internal" href="#messageParser.DHTHop" title="messageParser.DHTHop"><code class="xref py py-meth docutils literal"><span class="pre">DHTHop()</span></code></a> objects</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="messageParser.MAKE_MSG_DHT_PUT">
+<em class="property">class </em><code class="descclassname">messageParser.</code><code class="descname">MAKE_MSG_DHT_PUT</code><span class="sig-paren">(</span><em>key</em>, <em>content</em>, <em>ttl=43200</em>, <em>replication=3</em><span class="sig-paren">)</span><a class="headerlink" href="#messageParser.MAKE_MSG_DHT_PUT" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a MSG_DHT_PUT message to send later.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>key</strong> (<em>int</em>) &#8211; key as integer</li>
+<li><strong>content</strong> (<em>bytearray</em>) &#8211; The content to be stored</li>
+<li><strong>ttl</strong> (<em>int</em>) &#8211; time the content is available in seconds (43200 per default)</li>
+<li><strong>replication</strong> (<em>int</em>) &#8211; The amount of replication. A replication degree of three means a tripple redundancy. If one node crashes, there are still two nodes available for example.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="messageParser.MAKE_MSG_DHT_TRACE_REPLY">
+<em class="property">class </em><code class="descclassname">messageParser.</code><code class="descname">MAKE_MSG_DHT_TRACE_REPLY</code><span class="sig-paren">(</span><em>key</em>, <em>hops</em><span class="sig-paren">)</span><a class="headerlink" href="#messageParser.MAKE_MSG_DHT_TRACE_REPLY" title="Permalink to this definition">¶</a></dt>
 <dd><p>Initializes a DHT_TRACE_REPLY message to send later.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />

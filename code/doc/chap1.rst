@@ -1,3 +1,14 @@
+Chord Node
+================
+
+.. module:: Node
+
+:mod:`Node`
+---------------------------------------------
+.. automodule:: Node
+   :members:
+
+
 Helpers
 ================
 Helpers are various classes to support the DHT operations

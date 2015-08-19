@@ -31,7 +31,7 @@
 
   
     <link rel="top" title="Chord DHT 1 documentation" href="#"/>
-        <link rel="next" title="Helpers" href="chap1.html"/> 
+        <link rel="next" title="Chord Node" href="chap1.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -71,7 +71,11 @@
           
           
               <ul>
-<li class="toctree-l1"><a class="reference internal" href="chap1.html">Helpers</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="chap1.html">Chord Node</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chap1.html#module-Node"><code class="docutils literal"><span class="pre">Node</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chap1.html#helpers">Helpers</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="chap1.html#module-storage"><code class="docutils literal"><span class="pre">storage</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="chap1.html#module-messageParser"><code class="docutils literal"><span class="pre">messageParser</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="chap1.html#module-iniParser"><code class="docutils literal"><span class="pre">iniParser</span></code></a></li>
@@ -121,13 +125,17 @@
   <div class="section" id="dht-chord-module-in-python">
 <h1>DHT Chord Module in Python<a class="headerlink" href="#dht-chord-module-in-python" title="Permalink to this headline">¶</a></h1>
 <p>Chord is a distributed hash table as described by Ion
-Stoica et al. in this  <a class="reference external" href="http://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf">paper</a>. We provide a implementation in Python
+Stoica et al. in this  <a class="reference external" href="http://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf">paper</a>. We provide a implementation in Python 3
 developed for the course <a class="reference external" href="http://www.net.in.tum.de/de/lehre/ss15/vorlesungen/vorlesung-peer-to-peer-systeme/">P2P Network Security</a> at TU Munich.</p>
-<p>For RPC calls the <a class="reference external" href="https://pypi.python.org/pypi/aiomas/0.2.0">aiomas</a> library is used.</p>
+<p>For RPC calls the <a class="reference external" href="https://pypi.python.org/pypi/aiomas/0.5.0">aiomas</a> library is used which bases on AsyncIO.</p>
 <p>Contents:</p>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="chap1.html">Helpers</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="chap1.html">Chord Node</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chap1.html#module-Node"><code class="docutils literal"><span class="pre">Node</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chap1.html#helpers">Helpers</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="chap1.html#module-storage"><code class="docutils literal"><span class="pre">storage</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="chap1.html#module-messageParser"><code class="docutils literal"><span class="pre">messageParser</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="chap1.html#module-iniParser"><code class="docutils literal"><span class="pre">iniParser</span></code></a></li>
@@ -155,7 +163,7 @@ developed for the course <a class="reference external" href="http://www.net.in.t
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="chap1.html" class="btn btn-neutral float-right" title="Helpers" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="chap1.html" class="btn btn-neutral float-right" title="Chord Node" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
     </div>
