@@ -8,6 +8,7 @@ import logging
 import errno
 
 from helpers.storage import Storage
+from helpers.replica import Replica
 
 CHORD_FINGER_TABLE_SIZE = 8 # TODO: 256
 CHORD_RING_SIZE = 2**CHORD_FINGER_TABLE_SIZE  # Maximum number of addresses in the Chord network
@@ -532,7 +533,7 @@ class Node(aiomas.Agent):
             print("Stored entries: ", len(self.storage.data))
 
     @asyncio.coroutine
-    def put_data(self, key, data, ttl):
+    def put_data(self, key, data, ttl, replicationCount=3):
         storage_node = yield from self.find_successor(key)
         print("Found successor for storage: ", storage_node)
 
