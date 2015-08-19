@@ -24,3 +24,8 @@ h1 xterm -e python3 -u main.py -I h1 &
 h2 xterm -e python3 -u main.py -I h2 -B h1 &
 h3 xterm -e python3 -u main.py -I h3 -B h1 &
 h4 xterm -e python3 -u main.py -I h4 -B h1 &
+
+for mininet python support you have to install the mininet utils
+type
+mininet/util/install.sh -fw
+git clone git://github.com/mininet/mininet
