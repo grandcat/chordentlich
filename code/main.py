@@ -46,7 +46,7 @@ print("port_start", port_start)
 # TODO: parse INI config file here
 
 # Define multiple agents per node for accepting RPCs
-c = aiomas.Container(("localhost", port))
+c = aiomas.Container((ipaddress, port))
 nodes = [c.spawn(Node) for i in range(1)]
 
 loop = asyncio.get_event_loop()

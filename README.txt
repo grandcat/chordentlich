@@ -16,6 +16,11 @@ apt-get install mininet
 
 sudo service openvswitch-controller stop
 sudo update-rc.d openvswitch-controller disable
-sudo mn
-> h1 python3 main.py -I h1 &
-> h2 python3 main.py -I h2 -B h1
+sudo mn --topo single,4
+
+and enter to mininet:
+
+h1 xterm -e python3 -u main.py -I h1 &
+h2 xterm -e python3 -u main.py -I h2 -B h1 &
+h3 xterm -e python3 -u main.py -I h3 -B h1 &
+h4 xterm -e python3 -u main.py -I h4 -B h1 &
