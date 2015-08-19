@@ -15,24 +15,34 @@ Main application
 logging.basicConfig(format='[%(levelname)s:%(threadName)s:%(name)s:%(funcName)s] %(message)s', level=logging.INFO)
 
 # Parse console arguments
-opts, args = getopt.getopt(sys.argv[1:], "p:s:c:")
-port = -1
-port_start = -1
-host_count = -1
-for key, val in opts:
-    if key == "-p":
-        port = int(val)
-    elif key == "-s":
-        port_start = int(val)
-    elif key == "-c":
-        host_count = int(val)
+opts, args = getopt.getopt(sys.argv[1:], "I:i:B:b:")
 
+port_start = -1
+ipaddress = "127.0.0.1"
+bootip = None
+
+
+bootport = 9025
+port = 9025
+
+for key, val in opts:
+    if key == "-I":
+        ipaddress = val
+    if key == "-i":
+        port = int(val)
+    if key == "-B":
+        bootip = val
+    elif key == "-b":
+        bootport = int(val)
+
+print("bootip", bootip)
 print("Port", port)
 # Testing: First port is bootstrap node
-bootstrap_addr = ("tcp://localhost:" + str(port_start) + "/0") if port != port_start else None
+bootstrap_addr = ("tcp://"+bootip+":" + str(bootport) + "/0") if bootip else None
 print("Address/Port of Bootstrap Node: ", (bootstrap_addr or "this node"))
 print("-------------------")
-
+print("port", port)
+print("port_start", port_start)
 # TODO: parse INI config file here
 
 # Define multiple agents per node for accepting RPCs
@@ -41,7 +51,7 @@ nodes = [c.spawn(Node) for i in range(1)]
 
 loop = asyncio.get_event_loop()
 # Start API server interface
-api_server = loop.create_server(lambda: ApiServer(nodes[0]), "127.0.0.1", 3086 + port)
+api_server = loop.create_server(lambda: ApiServer(nodes[0]), ipaddress, 3086 + port)
 loop.run_until_complete(api_server)
 # Start DHT node
 loop.run_until_complete(nodes[0].join(bootstrap_address=bootstrap_addr))
