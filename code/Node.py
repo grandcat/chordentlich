@@ -8,6 +8,7 @@ import logging
 import errno
 
 from helpers.storage import Storage
+from helpers.replica import Replica
 
 CHORD_FINGER_TABLE_SIZE = 8 # TODO: 256
 CHORD_RING_SIZE = 2**CHORD_FINGER_TABLE_SIZE  # Maximum number of addresses in the Chord network
@@ -585,46 +586,68 @@ class Node(aiomas.Agent):
             print("Stored entries: ", len(self.storage.data))
 
     @asyncio.coroutine
-    def put_data(self, key, data, ttl):
-        storage_node = yield from self.find_successor(key)
-        print("Found successor for storage:", storage_node)
+    def put_data(self, key, data, ttl, replicationCount=3):
+        replica = Replica(CHORD_RING_SIZE)
 
-        if storage_node["node_id"] == self.id:
-            self.storage.put(key, data, ttl=ttl)
+        keys = replica.get_key_list(key, replicationCount)
+
+        print("\n\n\n\nPUT KEYS ARE ", keys) # [197, 210, 70]
+        successes = 0
+        for keyWithReplicaIndex in keys:
+            storage_node = yield from self.find_successor(keyWithReplicaIndex)
+            print("Found successor for storage: ", storage_node)
+
+            if storage_node["node_id"] == self.id:
+                self.storage.put(keyWithReplicaIndex, data, ttl=ttl)
+                successes += 1
+            else:
+                # Directly connect to remote peer and store it there
+                # TODO: validate
+                result, status = yield from self.run_rpc_safe(storage_node["node_address"],
+                                                              "rpc_dht_put_data", keyWithReplicaIndex, data, ttl)
+                if result["status"] == 0:
+                    successes += 1
+                else:
+                    pass # TODO: FAIL MESSAGE
+
+        print("\n\n\n\PUTS OK: ", successes)
+        if successes >= 1:
             return {
-                "status": 0
+                "status": 0,
+                "successes" : successes
             }
         else:
-            # Directly connect to remote peer and store it there
-            # TODO: validate
-            result, status = yield from self.run_rpc_safe(storage_node["node_address"],
-                                                          "rpc_dht_put_data", key, data, ttl)
-            if status != 0:
-                return {
-                    "status": status,
-                }
-            return result
+            return {
+                "status": 1,
+                "successes" : successes,
+                "messages" : "Data could not be saved."
+            }
 
     @asyncio.coroutine
     def get_data(self, key):
-        storage_node = yield from self.find_successor(key)
-        print("Found successor for retrieval:", storage_node)
+        replica = Replica(CHORD_RING_SIZE)
+        keys = replica.get_key_list(key, 1) # 5 is the replications that are tried before abort
 
-        if storage_node["node_id"] == self.id:
-            return {
-                "status": 0,
-                "data": self.storage.get(key)
-            }
-        else:
-            # Directly connect to remote peer and fetch data from there
-            # TODO: validate
-            result, status = yield from self.run_rpc_safe(storage_node["node_address"],
-                                                          "rpc_dht_get_data", key)
-            if status != 0:
+        for keyWithReplicaIndex in keys:
+            storage_node = yield from self.find_successor(keyWithReplicaIndex)
+            print("got storage_node: ", storage_node);
+            if storage_node["node_id"] == self.id:
                 return {
-                    "status": status,
+                    "status": 0,
+                    "data": self.storage.get(keyWithReplicaIndex)
                 }
-            return result
+
+            else:
+                # Directly connect to remote peer and fetch data from there
+                # TODO: validate
+                result, status = yield from self.run_rpc_safe(storage_node["node_address"],
+                                                              "rpc_dht_get_data", keyWithReplicaIndex)
+                if result["status"] == 0:
+                    return result
+                else:
+                    print("result ERROR", result)
+
+        return {"status": 1, "data": []}
 
     ##########################################################################
     ### RPC wrappers and functions for maintaining Chord's network overlay ###

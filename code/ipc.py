@@ -67,8 +67,7 @@ class ApiServer(asyncio.Protocol):
         # Convert byte array to base64 string for JSON compatibility
         # This can be replaced if "aiomas.codecs.MsgPack" is used for peer communication
         data = base64.b64encode(data).decode('utf-8')
-
-        dht_result = yield from self.node.put_data(key, data, ttl)
+        dht_result = yield from self.node.put_data(key, data, ttl, replication)
         print("DHT PUT result: %s" % dht_result)
 
     @asyncio.coroutine
@@ -76,7 +75,6 @@ class ApiServer(asyncio.Protocol):
         assert isinstance(api_message, DHTMessageGET)
 
         key = api_message.get_key()
-        print("DHT GET key: %d" % key)
 
         dht_result = yield from self.node.get_data(key)
         # TODO: Convert base64 back to bytes
