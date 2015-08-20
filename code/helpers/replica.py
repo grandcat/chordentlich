@@ -36,7 +36,7 @@ class Replica:
     """
     def get_key_list(self, key, replicationCount):
         indices = []
-        for i in range(0, replicationCount): 
+        for i in range(0, replicationCount):
             indices.append(self.get_key(key, i))
 
         return indices

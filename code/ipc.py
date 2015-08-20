@@ -70,10 +70,14 @@ class ApiServer(asyncio.Protocol):
         dht_result = yield from self.node.put_data(key, data, ttl, replication)
         print("DHT PUT result: %s" % dht_result)
 
+    @asyncio.coroutine
     def handle_dht_get(self, api_message):
         assert isinstance(api_message, DHTMessageGET)
 
         key = api_message.get_key()
+        print("DHT GET key: %d" % key)
+        print("ßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßß")
+        print("DHT GET key: %d" % key)
         print("DHT GET key: %d" % key)
 
         dht_result = yield from self.node.get_data(key)

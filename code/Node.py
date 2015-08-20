@@ -538,7 +538,7 @@ class Node(aiomas.Agent):
 
         keys = replica.get_key_list(key, replicationCount)
 
-        print(keys) # [197, 210, 70]
+        print("\n\n\n\nPUT KEYS ARE ", keys) # [197, 210, 70]
         successes = 0
         for keyWithReplicaIndex in keys:
             storage_node = yield from self.find_successor(keyWithReplicaIndex)
@@ -556,7 +556,7 @@ class Node(aiomas.Agent):
                 else:
                     pass # TODO: FAIL MESSAGE
 
-
+        print("\n\n\n\PUTS OK: ", successes)
         if successes >= 1:
             return {
                 "status": 0,
@@ -572,13 +572,13 @@ class Node(aiomas.Agent):
     @asyncio.coroutine
     def get_data(self, key):
         replica = Replica(CHORD_RING_SIZE)
-        keys = replica.get_key_list(key, 5) # 5 is the replications that are tried before abort
-
+        keys = replica.get_key_list(key, 1) # 5 is the replications that are tried before abort
 
         for keyWithReplicaIndex in keys:
+            print("l",keyWithReplicaIndex)
             storage_node = yield from self.find_successor(keyWithReplicaIndex)
+            print("got storage_node: ", storage_node);
             if storage_node["node_id"] == self.id:
-                print("RETURN KEYDATA FOR KEY"+str(keyWithReplicaIndex)+":", str(self.storage.get(keyWithReplicaIndex)))
                 return {
                     "status": 0,
                     "data": self.storage.get(keyWithReplicaIndex)
@@ -588,10 +588,12 @@ class Node(aiomas.Agent):
                 # Directly connect to remote peer and fetch data from there
                 peer = yield from self.container.connect(storage_node["node_address"])
                 result = yield from peer.rpc_dht_get_data(keyWithReplicaIndex)  # TODO: validate
-                if result == 0:
+                if result["status"] == 0:
                     return result
+                else:
+                    print("result ERROR", result)
 
-        return {"status": 1}
+        return {"status": 1, "data": []}
     ##########################################################################
     ### RPC wrappers and functions for maintaining Chord's network overlay ###
     @asyncio.coroutine

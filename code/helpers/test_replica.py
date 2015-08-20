@@ -18,6 +18,8 @@ class TestIniParser(unittest.TestCase):
         print("Key list is")
         print(replica.get_key_list(123,6))
 
+        self.assertEqual((replica.get_key_list(8, 8)[0:3]), (replica.get_key_list(8, 4)[0:3]))
+
         self.assertEqual(len(replica.get_key_list(8, 3)), 3)
         self.assertNotEqual(k1, k2) # keys do not collide hopefully at a ring size of 10000
         self.assertEqual(k1, 7195)
