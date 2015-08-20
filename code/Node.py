@@ -575,7 +575,6 @@ class Node(aiomas.Agent):
         keys = replica.get_key_list(key, 1) # 5 is the replications that are tried before abort
 
         for keyWithReplicaIndex in keys:
-            print("l",keyWithReplicaIndex)
             storage_node = yield from self.find_successor(keyWithReplicaIndex)
             print("got storage_node: ", storage_node);
             if storage_node["node_id"] == self.id:

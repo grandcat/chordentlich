@@ -75,10 +75,6 @@ class ApiServer(asyncio.Protocol):
         assert isinstance(api_message, DHTMessageGET)
 
         key = api_message.get_key()
-        print("DHT GET key: %d" % key)
-        print("ßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßß")
-        print("DHT GET key: %d" % key)
-        print("DHT GET key: %d" % key)
 
         dht_result = yield from self.node.get_data(key)
         # TODO: Convert base64 back to bytes
