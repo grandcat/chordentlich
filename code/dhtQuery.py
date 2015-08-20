@@ -12,6 +12,14 @@ simulating the KX interface.
 print("This is a Chord interface. You can store and lookup entries here.")
 port = 4423
 
+ipaddress = input("Enter an IPAddress (Press enter to use localhost): ")
+port =  input("Enter a port (Press enter to use 4423): ")
+
+if (port == ""):
+    port = 4423
+if (ipaddress==""):
+    ipaddress = "127.0.0.1"
+
 while True:
     var = input("Do you want to (s)tore or (l)ookup?")
 
@@ -35,7 +43,7 @@ while True:
             str =  val.encode("utf-8")
             frame = MAKE_MSG_DHT_PUT(key, str).get_data()
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            server_address = ('127.0.0.1', port)
+            server_address = (ipaddress, port)
 
             try:
                 sock.connect(server_address)
@@ -75,7 +83,7 @@ while True:
         else:
             frame = MAKE_MSG_DHT_GET(key).get_data()
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            server_address = ('127.0.0.1', port)
+            server_address = (ipaddress, port)
 
             try:
                 sock.connect(server_address)
