@@ -9,6 +9,9 @@ import errno
 
 from helpers.storage import Storage
 from helpers.replica import Replica
+from helpers.messageDefinitions import *
+from jsonschema import validate
+from helpers.validator import *
 
 CHORD_FINGER_TABLE_SIZE = 8 # TODO: 256
 CHORD_RING_SIZE = 2**CHORD_FINGER_TABLE_SIZE  # Maximum number of addresses in the Chord network
@@ -747,6 +750,8 @@ class Node(aiomas.Agent):
         if not isinstance(remote_node, dict):
             raise TypeError('Invalid type in argument.')
 
+        validate(remote_node, SCHEMA_UPDATE_PREDECESSOR) # validata schema
+
         remote_id = remote_node["node_id"]
         remote_addr = remote_node["node_address"]
         # TODO: connect old predecessor if new node ID is not closer to us
@@ -818,6 +823,23 @@ class Node(aiomas.Agent):
             return {
                 "status": 1
             }
+    @asyncio.coroutine
+    def test_stresstest(self, message):
+
+        message = "ok"
+
+        # force some exceptions
+        try:
+            yield from self.rpc_update_predecessor({"node_id": 213}) # missing node address
+        except Exception as e:
+            message = str(e)
+
+        return message.encode("utf-8")
+
+        # if message == TESTMESSAGES_MESSAGE_FAKE_WRONGVALUE:
+        #     return "test wrong value ok".encode("utf-8")
+        # if message == TESTMESSAGES_MESSAGE_FAKE_MISSINGVALUE:
+        #     return "test missing value ok".encode("utf-8")
 
     ### RPC tests ###
     @asyncio.coroutine

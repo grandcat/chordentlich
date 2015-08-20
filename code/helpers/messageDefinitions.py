@@ -1,0 +1,4 @@
+from enum import Enum
+
+TESTMESSAGES_MESSAGE_FAKE_WRONGVALUE   = bytearray([0x1])
+TESTMESSAGES_MESSAGE_FAKE_MISSINGVALUE = bytearray([0x2])
