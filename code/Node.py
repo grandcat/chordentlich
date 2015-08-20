@@ -38,7 +38,7 @@ def in_interval(search_id, node_left, node_right, inclusive_left=False, inclusiv
                (search_id < min(node_left, node_right))
 
 
-def strip_node_response(data, keep_single_successor=False, keep_single_predecessor=False):
+def strip_node_response(data, immediate_neighbors=False, trace_log=False):
     if data is None:
         return None
 
@@ -46,10 +46,12 @@ def strip_node_response(data, keep_single_successor=False, keep_single_predecess
         "node_id": data["node_id"],
         "node_address": data["node_address"]
     }
-    if keep_single_successor and "successor" in data:
+    if immediate_neighbors and "successor" in data:
         output["successor"] = strip_node_response(data["successor"])
-    if keep_single_predecessor and "predecessor" in data:
+    if immediate_neighbors and "predecessor" in data:
         output["predecessor"] = strip_node_response(data["predecessor"])
+    if trace_log:
+        output["trace"] = data["trace"]
 
     return output
 
@@ -343,6 +345,7 @@ class Node(aiomas.Agent):
             id = (self.id - 2**k) % CHORD_RING_SIZE
             # Find predecessor
             successor = yield from self.find_successor(id, with_neighbors=True)
+            print("TRACE: ", successor)
             p = successor["predecessor"]
             # In rare cases with id exactly matching the node's key, successor is more correct
             # Ex: 116 is looking for node 114 (finger 2), predecessor would be node 249 with successor 114
@@ -411,11 +414,27 @@ class Node(aiomas.Agent):
         :rtype: dict or None
         """
         result = yield from self.find_successor_rec(node_id, with_neighbors=with_neighbors)
-        result = strip_node_response(result, keep_single_predecessor=with_neighbors, keep_single_successor=with_neighbors)
+        # Check for problems during lookup
+        if "status" in result and result["status"] != 0:
+            self.log.warn("Could not resolve responsible peer. Err: %s", result)
+            result = None
+
+        result = strip_node_response(result, immediate_neighbors=with_neighbors)
         return result
 
     @asyncio.coroutine
-    def find_successor_rec(self, node_id, with_neighbors=False):
+    def find_successor_trace(self, node_id):
+        """Wrapper for :func:`find_successor_rec` with trace log of intermediate hops.
+
+        :param node_id:
+        :return:
+        """
+        result = yield from self.find_successor_rec(node_id, tracing=True)
+        result = strip_node_response(result, trace_log=True)
+        return result
+
+    @asyncio.coroutine
+    def find_successor_rec(self, node_id, with_neighbors=False, tracing=False):
         """Recursive find successor.
 
         :param node_id:
@@ -430,17 +449,22 @@ class Node(aiomas.Agent):
         if in_interval(node_id, self.id, successor["node_id"], inclusive_right=True):
             # Augment node with infos about its successor (and its predecessor)
             # This also allows to check whether this node is still alive
-            successor_details = None
+            # TODO: also do live check if no details are needed
+            successor_details = successor.copy()
             if with_neighbors:
                 # TODO: validation
                 successor_details, status = yield from self.run_rpc_safe(successor["node_address"], "rpc_get_node_info")
-            else:
-                successor_details = successor
+                if status != 0:
+                    successor_details.update({"status": 1, "message": "last hop not responding"})
+
+            # Add list for tracing (last hop is already included in the return message)
+            if tracing:
+                successor_details["trace"] = []
+
             return successor_details
 
         else:
             # Find closest finger to node_id and forward recursive query
-            #
             # If the current finger's node does not respond, choose a less optimal one.
             # TODO: remember faulty nodes and replace if it happens too often
             this_node = self.as_dict()
@@ -452,9 +476,20 @@ class Node(aiomas.Agent):
 
                 # TODO: validate and check for None
                 peer_data, status = yield from self.run_rpc_safe(next_hop["node_address"], "rpc_find_successor_rec",
-                                                                 node_id, with_neighbors=with_neighbors)
+                                                                 node_id, with_neighbors=with_neighbors, tracing=tracing)
                 if status == 0:
                     print("[find_successor_rec] Remote result for id %d: %s" % (node_id, peer_data))
+
+                    # Tracing
+                    # If the recursion tree is built completely, the touched peers are inserted in a trace list on
+                    # the way back.
+                    # The preceding node inserts its next hop in the trace. This provides a basic protection that a
+                    # malicious node cannot prevent being visible in the list.
+                    if tracing:
+                        if peer_data is None:
+                            peer_data = {"status": 1, "message": "trace incomplete."}
+                        peer_data["trace"].append(next_hop)
+
                     return peer_data
 
                 print("[find_successor_rec] Remote id %d with '%s' failed. Try next [%d]." %
@@ -630,7 +665,7 @@ class Node(aiomas.Agent):
 
         for keyWithReplicaIndex in keys:
             storage_node = yield from self.find_successor(keyWithReplicaIndex)
-            print("got storage_node: ", storage_node);
+            print("got storage_node: ", storage_node)
             if storage_node["node_id"] == self.id:
                 return {
                     "status": 0,
@@ -648,6 +683,16 @@ class Node(aiomas.Agent):
                     print("result ERROR", result)
 
         return {"status": 1, "data": []}
+
+    @asyncio.coroutine
+    def get_trace(self, key):
+        nodes = yield from self.find_successor_trace(key)
+        trace_log = nodes["trace"]
+
+
+        for hop_index, node in enumerate(reversed(trace_log)):
+            print("Hop %d : node %s" % (hop_index, node))
+
 
     ##########################################################################
     ### RPC wrappers and functions for maintaining Chord's network overlay ###
@@ -733,9 +778,9 @@ class Node(aiomas.Agent):
         return True
 
     @aiomas.expose
-    def rpc_find_successor_rec(self, node_id, with_neighbors=False):
+    def rpc_find_successor_rec(self, node_id, with_neighbors=False, tracing=False):
         # TODO: validate params to prevent attacks!
-        res = yield from self.find_successor_rec(node_id, with_neighbors=with_neighbors)
+        res = yield from self.find_successor_rec(node_id, with_neighbors=with_neighbors, tracing=tracing)
         return res
 
     @aiomas.expose
