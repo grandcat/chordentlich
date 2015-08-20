@@ -17,6 +17,9 @@ port =  input("Enter a port (Press enter to use 4423): ")
 
 if (port == ""):
     port = 4423
+else:
+    port = int(port)
+    
 if (ipaddress==""):
     ipaddress = "127.0.0.1"
 
