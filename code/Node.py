@@ -9,6 +9,7 @@ import errno
 
 from helpers.storage import Storage
 from helpers.replica import Replica
+from helpers.messageDefinitions import *
 
 CHORD_FINGER_TABLE_SIZE = 8 # TODO: 256
 CHORD_RING_SIZE = 2**CHORD_FINGER_TABLE_SIZE  # Maximum number of addresses in the Chord network
@@ -773,7 +774,14 @@ class Node(aiomas.Agent):
             return {
                 "status": 1
             }
+    @asyncio.coroutine
+    def test_stresstest(self, message):
 
+        if message == TESTMESSAGES_MESSAGE_FAKE_WRONGVALUE:
+            return "test wrong value ok".encode("utf-8")
+        if message == TESTMESSAGES_MESSAGE_FAKE_MISSINGVALUE:
+            return "test missing value ok".encode("utf-8")
+            
     ### RPC tests ###
     @asyncio.coroutine
     def test_get_node_id(self, addr):

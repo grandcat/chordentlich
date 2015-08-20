@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import socket
 from helpers.messageParser import *
+from helpers.messageDefinitions import *
 
 """
 This is a console tool made to store and get data from the DHT.
@@ -19,14 +20,43 @@ if (port == ""):
     port = 4423
 else:
     port = int(port)
-    
+
 if (ipaddress==""):
     ipaddress = "127.0.0.1"
 
 while True:
-    var = input("Do you want to (s)tore or (l)ookup?")
+    var = input("Do you want to (s)tore or (l)ookup or s(t)tresstest?")
+    if var == "t":
+        print("What kind of stresstest do you want to perform?")
+        print("(1) Missing values")
+        print("(2) Wrong values")
+        val = input("Enter a number: ")
 
-    if var == "s":
+        if val=="1":
+            frame = TESTMESSAGES_MESSAGE_FAKE_WRONGVALUE
+        elif val=="2":
+            frame = TESTMESSAGES_MESSAGE_FAKE_MISSINGVALUE
+        else:
+            print("Warning: Invalid test number.")
+        str =  val.encode("utf-8")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_address = (ipaddress, port)
+
+        try:
+            sock.connect(server_address)
+            sock.sendall(frame)
+            print("Answer is:", sock.recv(1024).decode("utf-8"))
+
+        except Exception as error:
+            print("Something went wrong. Make sure you can connect to your node on port", port)
+            print(error)
+
+        finally:
+            sock.close()
+
+
+
+    elif var == "s":
         key = input("Enter a key as integer: ")
         val = input("Enter a value: ")
 
@@ -52,24 +82,10 @@ while True:
                 sock.connect(server_address)
                 print("Send to DHT: %s" % frame)
                 sock.sendall(frame)
-                #amount_received = 0
-                #data_available = 1
-
-                # output = bytearray()
-                # while data_available > 0 and amount_received < 1024:
-                #     data = sock.recv(16)
-                #     data_available = len(data)
-                #     amount_received += len(data)
-                #     output.extend(data)
-
-                # Parse a DHT_GET_REPLY.
-                #size = int.from_bytes(output[0:2], byteorder='big')
-                # content = output[34:size]
-
                 print("Sent STORE command for content: ",val)
 
             except Exception as error:
-                print("Something went wrong. Make sure you can connect to your localhost node on port", port)
+                print("Something went wrong. Make sure you can connect to your node on port", port)
                 print(error)
 
             finally:

@@ -3,7 +3,7 @@ import base64
 import logging
 import random
 from helpers.messageParser import DHTMessage, DHTMessagePUT, DHTMessageGET, DHTMessageGET_REPLY
-
+from helpers.messageDefinitions import *
 
 class ApiServer(asyncio.Protocol):
     def __init__(self, dht_node):
@@ -26,20 +26,29 @@ class ApiServer(asyncio.Protocol):
         parser = DHTMessage()
 
         try:
-            api_message = parser.read_binary(message)
-            # TEST
-            # cmd = message.decode().rstrip()
-            # if cmd.isdigit():
-            #     api_message = parser.read_file('helpers/test_messages/DHTGET')
-            #     self.get_id = int(cmd)
-            # else:
-            #     api_message = parser.read_file('helpers/test_messages/DHTPUT')
-            # TEST END
-            asyncio.Task(self.route_api_request(api_message))
+            if len(message) < 2: # 1 byte messages are control messages used for testing
+                asyncio.Task(self.route_api_testmessage(message))
+            else:
+                # TEST
+                # cmd = message.decode().rstrip()
+                # if cmd.isdigit():
+                #     api_message = parser.read_file('helpers/test_messages/DHTGET')
+                #     self.get_id = int(cmd)
+                # else:
+                #     api_message = parser.read_file('helpers/test_messages/DHTPUT')
+                # TEST END
+                api_message = parser.read_binary(message)
+                asyncio.Task(self.route_api_request(api_message))
 
         except Exception as e:  # TODO: refine to ParseException
             self.log.warn("API message of size %d could not be parsed.", len(message))
             self.transport.close()
+
+    @asyncio.coroutine
+    def route_api_testmessage(self, message):
+        result = yield from self.node.test_stresstest(message)
+        self.transport.write(result)    
+        self.transport.close()
 
     @asyncio.coroutine
     def route_api_request(self, api_message):
