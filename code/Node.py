@@ -502,9 +502,9 @@ class Node(aiomas.Agent):
                 next_hop = self.get_closest_preceding_finger(node_id, fall_back=i)
                 i += 1
 
-            # Already reached end of unique peers in our finger table
+            # Already reached end of unique peers in our finger table: we are isolated right now
             self.log.info("No suitable alternatives as next hop.")
-            return None
+            return {"status": 1, "message": "no suitable alternatives found, giving up."}
 
     # @asyncio.coroutine
     # def find_successor_rec(self, node_id):
@@ -691,10 +691,10 @@ class Node(aiomas.Agent):
     @asyncio.coroutine
     def get_trace(self, key):
         nodes = yield from self.find_successor_trace(key)
-        trace_log = nodes["trace"]
+        print("Get_trace result:", nodes)
 
-
-        for hop_index, node in enumerate(reversed(trace_log)):
+        print("Hop 0: node %s", nodes["node_id"])
+        for hop_index, node in enumerate(nodes["trace"]):
             print("Hop %d : node %s" % (hop_index, node))
 
 
