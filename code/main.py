@@ -7,23 +7,30 @@ import logging
 import sys
 from Node import Node
 from ipc import ApiServer
+from helpers.iniParser import IniParser
 
 """
 Main application
 """
-# Setup logging
-logging.basicConfig(format='[%(levelname)s:%(threadName)s:%(name)s:%(funcName)s] %(message)s', level=logging.INFO)
+
 
 # Parse console arguments
 opts, args = getopt.getopt(sys.argv[1:], "I:i:B:b:")
-
+projectIni = IniParser("config.ini")
 port_start = -1
-ipaddress = "127.0.0.1"
-bootip = None
+ipaddress = projectIni.get("HOSTNAME", "DHT")
+port = int(projectIni.get("PORT", "DHT"))
+bootip = projectIni.get("HOSTNAME", "BOOTSTRAP")
+bootport = projectIni.get("PORT", "BOOTSTRAP")
+ipaddress = projectIni.get("HOSTNAME", "DHT")
 
+logfile = projectIni.get("LOG")
 
-bootport = 9025
-port = 9025
+if logfile is not None:
+    logging.basicConfig(filename=logfile, format='[%(levelname)s%(funcName)s] %(message)s', level=logging.INFO)
+else:
+    logging.basicConfig(format='[%(levelname)s:%(funcName)s] %(message)s', level=logging.INFO)
+
 
 for key, val in opts:
     if key == "-I":

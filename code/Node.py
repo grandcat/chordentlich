@@ -76,9 +76,10 @@ class Node(aiomas.Agent):
         # Async RPC init
         super().__init__(container, node_address)
         self.node_address = node_address
-        # Logging
+
         self.log = logging.getLogger(__name__)
         self.log.info("Node server listening on %s.", node_address)
+
         # Node state
         self.activated = True
         self.network_timeout = 10
@@ -771,6 +772,10 @@ class Node(aiomas.Agent):
 
     @aiomas.expose
     def rpc_update_successor(self, node_hint):
+
+        self.log.debug("JSON4 rpc_update_successor   % s  " %  str(node_hint))
+
+
         if not isinstance(node_hint, dict):
             raise TypeError('Invalid type in argument.')
 
@@ -778,18 +783,26 @@ class Node(aiomas.Agent):
 
     @aiomas.expose
     def rpc_update_finger_table(self, origin_node, i):
+
+        self.log.debug("JSON4 rpc_update_finger_table   % s  " %  str(origin_node))
+
         # TODO: Update finger table
         yield from self.update_finger_table(origin_node, i)
         return True
 
     @aiomas.expose
     def rpc_find_successor_rec(self, node_id, with_neighbors=False, tracing=False):
+
+        self.log.debug("JSON4 rpc_find_successor_rec % s  " %  str(node_id))
         # TODO: validate params to prevent attacks!
         res = yield from self.find_successor_rec(node_id, with_neighbors=with_neighbors, tracing=tracing)
         return res
 
     @aiomas.expose
     def rpc_get_closest_preceding_finger(self, node_id):
+
+        self.log.debug("JSON4 rpc_get_closest_preceding_finger   % s  " %   str(node_id))
+
         # TODO: validate params to prevent attacks!
         res = yield from self.get_closest_preceding_finger(node_id)
         return res
@@ -797,6 +810,9 @@ class Node(aiomas.Agent):
     ### RPC Data storage ###
     @aiomas.expose
     def rpc_dht_put_data(self, key, data, ttl):
+
+        self.log.debug("JSON4 rpc_dht_put_data   % s  " %   str(data))
+
         # TODO: validate
         if in_interval(key, self.predecessor["node_id"], self.id, inclusive_right=True):
             self.storage.put(key, data, ttl=ttl)
