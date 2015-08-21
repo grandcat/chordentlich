@@ -6,6 +6,8 @@ The message parser parses and generates binary messages to communicate with othe
 
 from struct import *
 import ipaddress # imported here as sphynx  documentation generator crashes if it is written on top
+from jsonschema import validate
+
 
 DHTCommands = {
     500: "MSG_DHT_PUT",
@@ -67,16 +69,28 @@ class DHTMessage():
             self.message = DHTMessagePUT(self.data, self.getSize())
         elif command=="MSG_DHT_TRACE":
             self.message = DHTMessageTRACE(self.data, self.getSize())
-        elif command=="MSG_DHT_TRACE_REPLY":
-            self.message = DHTMessageTRACE(self.data, self.getSize())
-        elif command=="MSG_DHT_GET_REPLY":
-            self.message = DHTMessageGET_REPLY(self.data, self.getSize())
         elif command=="MSG_DHT_ERROR":
             self.message = DHTMessageERROR(self.data, self.getSize())
         else: # TODO: throw exception here
             pass
 
+        self.message.command = command
+
         return self.message
+
+    def is_valid(self):
+        try:
+            validate(self.message.make_dict(), SCHEMA_MSG_DHT[self.message.command])
+            return True
+        except:
+            return False
+
+    def get_validation_execption(self):
+        try:
+            validate(self.message.make_dict(), SCHEMA_MSG_DHT[self.message.command])
+            return None
+        except Exception as e:
+            return str(e)
 
     def getSize(self):
         """
@@ -89,7 +103,17 @@ class DHTMessageParent():
         self.data = data
         self.size = size
 
+
 class DHTMessagePUT(DHTMessageParent):
+
+    def make_dict(self):
+        return {
+            "ttl" : self.get_ttl(),
+            "key" : self.get_key(),
+            "replication" : self.get_replication(),
+            "content_length" : len(self.get_content())
+        }
+
     def get_key(self):
         """
         Returns the key as integer
@@ -97,6 +121,7 @@ class DHTMessagePUT(DHTMessageParent):
         :rtype: int
         """
         return  int.from_bytes( self.data[4:36], byteorder='big')
+
     def get_ttl(self):
         """
         Returns the time to live (ttl) in seconds
@@ -104,6 +129,7 @@ class DHTMessagePUT(DHTMessageParent):
         :rtype: int
         """
         return int.from_bytes( self.data[36:38], byteorder='big')
+
     def get_replication(self):
         """
         Returns the replication
@@ -111,8 +137,10 @@ class DHTMessagePUT(DHTMessageParent):
         :rtype: int
         """
         return int.from_bytes( self.data[38:39], byteorder='big')
+
     def get_reserved(self):
         return self.data[39:44]
+
     def get_content(self):
         """
         Returns the content
@@ -123,6 +151,12 @@ class DHTMessagePUT(DHTMessageParent):
         return self.data[44:self.size]
 
 class DHTMessageGET(DHTMessageParent):
+
+    def make_dict(self):
+        return {
+            "key" : self.get_key()
+        }
+
     def get_key(self):
         """
         Returns the key as integer
@@ -132,6 +166,12 @@ class DHTMessageGET(DHTMessageParent):
         return int.from_bytes(self.data[4:36], byteorder='big')
 
 class DHTMessageTRACE(DHTMessageParent):
+
+    def make_dict(self):
+        return {
+            "key" : self.get_key()
+        }
+
     def get_key(self):
         """
         Returns the key as integer

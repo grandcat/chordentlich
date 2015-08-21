@@ -5,6 +5,8 @@
 import unittest
 import imp
 from messageParser import *
+from validator import *
+import json
 
 class TestMessageParser(unittest.TestCase):
 
@@ -13,18 +15,17 @@ class TestMessageParser(unittest.TestCase):
         msg2 = DHTMessage()
         msg2.read_file('helpers/test_messages/DHTPUT')
 
-        print("key is", msg2.message.get_key())
-        print("ttl is", msg2.message.get_ttl())
-        print("replication is", msg2.message.get_replication())
-        print("reserved is", msg2.message.get_reserved())
-        print("content is", msg2.message.get_content())
+        print("content is: ", json.dumps(msg2.message.make_dict(), indent=2))
 
         self.assertEqual( msg2.message.get_content().decode("utf-8"), "HALLO WELT")
         self.assertEqual(msg2.message.get_ttl(), 1)
 
+
+        self.assertEqual(msg2.get_validation_execption(), None)
+        #msg2.data[0:2] = int(0).to_bytes(1, byteorder='big')   # make content longer than 64kb, this should throw an exception
+
         msg3 = DHTMessage()
         msg3.read_file('helpers/test_messages/DHTGET')
-
         self.assertEqual(msg3.message.get_key(), 1229782938247303441)
 
         msg3 = DHTMessage()
@@ -39,6 +40,8 @@ class TestMessageParser(unittest.TestCase):
         ]
 
         msg4 = MAKE_MSG_DHT_TRACE_REPLY(123, hops)
+
+
         # validate key
         self.assertEqual(msg4.frame[4:36], b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00{')
         # validate first and second hop peerId

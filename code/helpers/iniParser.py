@@ -31,14 +31,16 @@ class IniParser:
 
         with open(filename) as f:
             for line in f:
-                if line != "":
-                    if line.startswith('['):
-                        currentsection = line.strip()[1:-1]
-
-                        self.data[currentsection] = {}
-                    else:
-                        ar = line.split('=', 1 )
-                        self.data[currentsection][ar[0].strip()] = ar[1].strip()
+                try:
+                    if line != "":
+                        if line.startswith('['):
+                            currentsection = line.strip()[1:-1]
+                            self.data[currentsection] = {}
+                        else:
+                            ar = line.split('=', 1 )
+                            self.data[currentsection][ar[0].strip()] = ar[1].strip()
+                except:
+                    print("NOTE: Could not parse line:", line)
 
     def get(self, attribute, section=""):
         """
@@ -57,4 +59,7 @@ class IniParser:
                 inip = IniParser("test.ini")
                 inip.get("PORT", "DHT") # returns  123
         """
-        return self.data[section][attribute]
+        if attribute in  self.data[section]:
+            return self.data[section][attribute]
+        else:
+            return None
