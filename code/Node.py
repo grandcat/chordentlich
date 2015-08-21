@@ -85,10 +85,12 @@ class Node(aiomas.Agent):
         self.activated = True
         self.network_timeout = 10
         self.storage = Storage()
-        # Overlay network
+        # Wide-range Overlay network
         self.fingertable = []
         self.fix_interval = 7 + random.randint(0, 10)
         self.fix_next = 0
+        # Short-range successor list
+        self.successor_list = []
 
     def as_dict(self, serialize_neighbors=False):
         dict_node = {
@@ -107,16 +109,6 @@ class Node(aiomas.Agent):
         # TODO: public key hash instead of protocol + IP address + port
         # TODO: remove modulo
         return int(hashlib.sha256(address.encode()).hexdigest(), 16) % CHORD_RING_SIZE
-
-    # def get_entry(self, position):
-    #     # Todo: rethink whether this makes sense
-    #     addition = 2**(position-1)
-    #     entry = (self.id + addition) % CHORD_RING_SIZE
-    #     return entry
-
-    @aiomas.expose
-    def get_node_id(self):
-        return self.id
 
     @asyncio.coroutine
     def join(self, node_id=None, node_address=None, bootstrap_address=None):
