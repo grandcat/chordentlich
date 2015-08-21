@@ -23,10 +23,9 @@ SCHEMA_RPC_PUT_DATA = {
 
 
 
-SCHEMA_RPC_UPDATE_FINGERTABLE = {
+SCHEMA_RPC = {}
 
-
-}
+#SCHEMA_RPC[]
 
 # Schema for the DHT messages constructed in messageParser.py
 #
@@ -36,7 +35,7 @@ SCHEMA_MSG_DHT["MSG_DHT_GET"] = {}
 SCHEMA_MSG_DHT["MSG_DHT_PUT"] = {
     "type" : "object",
      "properties" : {
-        "ttl" : {"type" : "number", "minimum":0, "maximum": 1},
+        "ttl" : {"type" : "number", "minimum":0, "maximum": 255},
         "replication" :  {"type" : "number", "minimum":0, "maximum": 255}
      }
 }
