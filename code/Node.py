@@ -151,20 +151,21 @@ class Node(aiomas.Agent):
             # self.predecessor = successor_node  # If removed, easier to replace with checks on update_predecessor
         self.print_finger_table()
 
-        if self.bootstrap_address:
-            remote_peer = yield from self.container.connect(self.bootstrap_address)
-            ft =  yield from remote_peer.rpc_get_fingertable()
-            print("Bootstrap Finger Table: ")
-            self.print_finger_table(ft)
+        # if self.bootstrap_address:
+        #     remote_peer = yield from self.container.connect(self.bootstrap_address)
+        #     ft =  yield from remote_peer.rpc_get_fingertable()
+        #     print("Bootstrap Finger Table: ")
+        #     self.print_finger_table(ft)
 
     @asyncio.coroutine
     def init_finger_table(self):
-        print("in init finger")
+        """Generates basic finger table for joining nodes.
+        """
         self.__generate_fingers(None)
 
-        remote_peer = yield from self.container.connect(self.bootstrap_address)
+        successor, status = yield from self.run_rpc_safe(self.bootstrap_address, "rpc_find_successor_rec",
+                                                         self.fingertable[0]["start"])
         # print("Looking for %s" % self.fingertable[0]["start"])
-        successor = yield from remote_peer.rpc_find_successor_rec(self.fingertable[0]["start"])
         self.fingertable[0]["successor"] = successor  # TODO: validate successor
         self.print_finger_table()
 
@@ -188,10 +189,10 @@ class Node(aiomas.Agent):
                 # TODO: validate data
                 # BUG: if only 2 nodes in network, the node being responsible for the requested start ID
                 #      is wrong because bootstrap node does not updated its table yet
-                finger_successor = yield from remote_peer.rpc_find_successor_rec(finger_next["start"])
+                finger_successor, status = yield from self.run_rpc_safe(self.bootstrap_address, "rpc_find_successor_rec",
+                                                                        finger_next["start"])
                 self.log.info("Node for %d: %s", finger_next["start"], finger_successor)
                 finger_next["successor"] = finger_successor
-
 
         # Optimization for joining node (if not bootstrap node)
         # - Find close node to myself (e.g., successor)
@@ -279,8 +280,8 @@ class Node(aiomas.Agent):
 
             # Notify our predecessor to be aware of us (new immediate successor)
             # It might already know. In that case, this call is useless.
-            remote_peer = yield from self.container.connect(self.predecessor["node_address"])
-            yield from remote_peer.rpc_update_successor(self.as_dict())
+            yield from self.run_rpc_safe(self.predecessor["node_address"], "rpc_update_successor",
+                                         self.as_dict())
 
         elif update_pred["node_address"] != self.node_address:
             # Stabilize:
@@ -358,8 +359,10 @@ class Node(aiomas.Agent):
             #    p = p["successor"]
             self.log.info("Update peer: %s", p)
             if self.id != p["node_id"]:
-                remote_peer = yield from self.container.connect(p["node_address"])
-                yield from remote_peer.rpc_update_finger_table(self.as_dict(), k)
+                yield from self.run_rpc_safe(p["node_address"], "rpc_update_finger_table",
+                                             self.as_dict(), k)
+                # remote_peer = yield from self.container.connect(p["node_address"])
+                # yield from remote_peer.rpc_update_finger_table(self.as_dict(), k)
 
     @asyncio.coroutine
     def fix_finger(self, finger_id=-1):
@@ -439,7 +442,7 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def find_successor_rec(self, node_id, with_neighbors=False, tracing=False):
-        """Recursive find successor.
+        """Recursive find successor. Used locally and by remote peers.
 
         :param node_id:
             Key ``node_id`` whose responsible successor is interesting.
