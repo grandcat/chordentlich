@@ -765,8 +765,6 @@ class Node(aiomas.Agent):
         if not isinstance(remote_node, dict):
             raise TypeError('Invalid type in argument.')
 
-        validate(remote_node, SCHEMA_UPDATE_PREDECESSOR) # validata schema
-
         remote_id = remote_node["node_id"]
         remote_addr = remote_node["node_address"]
         # TODO: connect old predecessor if new node ID is not closer to us
