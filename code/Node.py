@@ -511,7 +511,7 @@ class Node(aiomas.Agent):
             return {"status": 1, "message": "no suitable alternatives found, giving up."}
 
     # @asyncio.coroutine
-    # def find_successor_rec(self, node_id):
+    # def find_successor(self, node_id):
     #     """ Iterative find successor
     #
     #     .. warning::
@@ -525,47 +525,47 @@ class Node(aiomas.Agent):
     #         print("[find_successor_rec] Calculated node for %d: %s" % (node_id, node))
     #         return node["successor"]  # Attention: relies on available successor information which has to be
     #                                   # retrieved by closest_preceding_finger()
-
-    @asyncio.coroutine
-    def find_predecessor(self, node_id):
-        """Find predecessor
-
-        .. warning::
-           Deprecated: use :func:`find_successor_rec` instead. It also contains a reference to the node's predecessor.
-        """
-        selected_node = self.as_dict(serialize_neighbors=True)
-        previous_selected_node = None
-
-        while not in_interval(node_id, selected_node["node_id"], selected_node["successor"]["node_id"], inclusive_right=True):
-            self.log.info("Node ID %d not in interval (%d, %d]",
-                          node_id,
-                          selected_node["node_id"],
-                          selected_node["successor"]["node_id"])
-            if selected_node["node_id"] == self.id:
-                # Typically in first round: use our finger table to locate close peer
-                print("Looking for predecessor of %d in first round." % node_id)
-                selected_node = yield from self.get_closest_preceding_finger(node_id)
-
-                print("Closest finger: %s" % selected_node)
-                # If still our self, we do not know closer peer and should stop searching
-                # if selected_node["node_id"] == self.id:
-                #     break
-
-            else:
-                # For all other remote peers, we have to do a RPC here
-                self.log.debug("Starting remote call.")
-                peer = yield from self.container.connect(selected_node["node_address"])
-                selected_node = yield from peer.rpc_get_closest_preceding_finger(node_id)
-                # TODO: validate received input before continuing the loop
-                self.log.info("Remote closest node for ID %d: %s", node_id, str(selected_node))
-
-            # Detect loop without progress
-            if previous_selected_node == selected_node:
-                self.log.error("No progress while looking for node closer to ID %d than node %s", node_id, selected_node)
-                raise aiomas.RemoteException("Remote peer did not return more closer node to given Id " + str(node_id), "")
-            previous_selected_node = selected_node
-
-        return selected_node
+    #
+    # @asyncio.coroutine
+    # def find_predecessor(self, node_id):
+    #     """Find predecessor
+    #
+    #     .. warning::
+    #        Deprecated: use :func:`find_successor_rec` instead. It also contains a reference to the node's predecessor.
+    #     """
+    #     selected_node = self.as_dict(serialize_neighbors=True)
+    #     previous_selected_node = None
+    #
+    #     while not in_interval(node_id, selected_node["node_id"], selected_node["successor"]["node_id"], inclusive_right=True):
+    #         self.log.info("Node ID %d not in interval (%d, %d]",
+    #                       node_id,
+    #                       selected_node["node_id"],
+    #                       selected_node["successor"]["node_id"])
+    #         if selected_node["node_id"] == self.id:
+    #             # Typically in first round: use our finger table to locate close peer
+    #             print("Looking for predecessor of %d in first round." % node_id)
+    #             selected_node = yield from self.get_closest_preceding_finger(node_id)
+    #
+    #             print("Closest finger: %s" % selected_node)
+    #             # If still our self, we do not know closer peer and should stop searching
+    #             # if selected_node["node_id"] == self.id:
+    #             #     break
+    #
+    #         else:
+    #             # For all other remote peers, we have to do a RPC here
+    #             self.log.debug("Starting remote call.")
+    #             peer = yield from self.container.connect(selected_node["node_address"])
+    #             selected_node = yield from peer.rpc_get_closest_preceding_finger(node_id)
+    #             # TODO: validate received input before continuing the loop
+    #             self.log.info("Remote closest node for ID %d: %s", node_id, str(selected_node))
+    #
+    #         # Detect loop without progress
+    #         if previous_selected_node == selected_node:
+    #             self.log.error("No progress while looking for node closer to ID %d than node %s", node_id, selected_node)
+    #             raise aiomas.RemoteException("Remote peer did not return more closer node to given Id " + str(node_id), "")
+    #         previous_selected_node = selected_node
+    #
+    #     return selected_node
 
     def get_closest_preceding_finger(self, node_id, fall_back=0, start_offset=CHORD_FINGER_TABLE_SIZE-1):
         """
