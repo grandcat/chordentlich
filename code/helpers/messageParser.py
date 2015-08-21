@@ -265,18 +265,19 @@ class MAKE_MSG_DHT_TRACE_REPLY:
     :param key: the key as integer
     :param hops: a list of :py:meth:`DHTHop` objects
     """
-    def __init__(self, key, hops ):
+    def __init__(self, key, hops):
 
         frame = bytearray()
 
-        size = int(16+256+len(hops)*(256+32+128))
+        size = int(32+256+len(hops)*(256+32*2+128))
+        assert size < 65536  # Size field only has length of 2 bytes (2^16 bits)
         size = int(size / 8) # convert to byte as size should be byte instead of bit
 
         frame += size.to_bytes(2, byteorder='big')
         frame += (504).to_bytes(2, byteorder='big') # 504 is MSG_DHT_TRACE_REPLY
         frame += key.to_bytes(32, byteorder='big')
 
-        for hop in hops:
+        for i, hop in enumerate(hops):
             frame += hop.as_bytes()
         self.frame = frame
 
@@ -316,20 +317,20 @@ class DHTHop:
         frame += self.IPv4Address
         frame += self.IPv6Address
 
-        return frame;
+        return frame
 
 class DHTMessageERROR:
-    def __init__(self, requestType, requestKey ):
+    def __init__(self, requestType, requestKey):
         frame = bytearray()
 
-        size = int(64+256)
+        size = int(32*2+256)
         size = int(size / 8) # convert to byte as size should be byte instead of bit
 
         frame += size.to_bytes(2, byteorder='big')
         frame += (505).to_bytes(2, byteorder='big') # 505 is MSG_DHT_ERROR
-        frame += key.to_bytes(32, byteorder='big')
-        frame += (requestType).to_bytes(2, byteorder='big')  # unused
-        frame += (requestKey).to_bytes(32, byteorder='big')
+        frame += requestKey.to_bytes(32, byteorder='big')
+        frame += requestType.to_bytes(2, byteorder='big')  # unused
+        frame += requestKey.to_bytes(32, byteorder='big')
         self.frame = frame
 
     def get_data(self):

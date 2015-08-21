@@ -2,7 +2,8 @@ import asyncio
 import base64
 import logging
 import random
-from helpers.messageParser import DHTMessage, DHTMessagePUT, DHTMessageGET, DHTMessageGET_REPLY, DHTMessageTRACE
+from helpers.messageParser import *
+from helpers.aiomasTools import aiomas_parse_url
 from helpers.messageDefinitions import *
 
 class ApiServer(asyncio.Protocol):
@@ -87,6 +88,7 @@ class ApiServer(asyncio.Protocol):
         assert isinstance(api_message, DHTMessageGET)
         # TEST TRACE
         yield from self.handle_dht_trace(api_message)
+        return
 
         key = api_message.get_key()
 
@@ -105,8 +107,27 @@ class ApiServer(asyncio.Protocol):
     def handle_dht_trace(self, api_message):
         # assert isinstance(api_message, DHTMessageTRACE)
         key = api_message.get_key()
-        print("Trace key: ", key)
         dht_result = yield from self.node.get_trace(key)
+
+        hops = []
+        for peer in dht_result:
+            node_id = peer["node_id"]
+            kx_port = 0
+
+            host = "0.0.0.0"
+            try:
+                (host, port), _ = aiomas_parse_url(peer["node_address"])
+            except ValueError as e:
+                print("[Warn:handle_dht_trace] Could not parse hop '%s'." % peer["node_address"])
+            ipv4 = host
+
+            hop = DHTHop(node_id, kx_port, ipv4, "::")
+            hops.append(hop)
+
+        reply = MAKE_MSG_DHT_TRACE_REPLY(key, hops)
+        print("Trace binary:", reply.get_data())
+        self.transport.write(reply.get_data())
+        self.transport.close()
 
     def test_generate_dht_put(self):
         buffer = bytearray(30)

@@ -23,9 +23,10 @@ port = int(projectIni.get("PORT", "DHT"))
 bootip = projectIni.get("HOSTNAME", "BOOTSTRAP")
 bootport = projectIni.get("PORT", "BOOTSTRAP")
 
-logfile = projectIni.get("LOG")
+#logfile = projectIni.get("LOG")
+logfile = None
 
-if logfile is not None:
+if logfile:
     logging.basicConfig(filename=logfile, format='[%(levelname)s:%(funcName)s] %(message)s', level=logging.INFO)
 else:
     logging.basicConfig(format='[%(levelname)s:%(funcName)s] %(message)s', level=logging.INFO)
