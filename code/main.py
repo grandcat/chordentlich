@@ -22,7 +22,6 @@ ipaddress = projectIni.get("HOSTNAME", "DHT")
 port = int(projectIni.get("PORT", "DHT"))
 bootip = projectIni.get("HOSTNAME", "BOOTSTRAP")
 bootport = projectIni.get("PORT", "BOOTSTRAP")
-ipaddress = projectIni.get("HOSTNAME", "DHT")
 
 logfile = projectIni.get("LOG")
 
