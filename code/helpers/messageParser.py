@@ -129,7 +129,7 @@ class DHTMessageGET(DHTMessageParent):
 
         :rtype: int
         """
-        return  int.from_bytes( self.data[4:36], byteorder='big')
+        return int.from_bytes(self.data[4:36], byteorder='big')
 
 class DHTMessageTRACE(DHTMessageParent):
     def get_key(self):
@@ -138,7 +138,7 @@ class DHTMessageTRACE(DHTMessageParent):
 
         :rtype: int
         """
-        return  int.from_bytes( self.data[4:12], byteorder='big')
+        return int.from_bytes(self.data[4:36], byteorder='big')
 
 class DHTMessageGET_REPLY:
     """

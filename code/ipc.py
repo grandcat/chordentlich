@@ -2,7 +2,7 @@ import asyncio
 import base64
 import logging
 import random
-from helpers.messageParser import DHTMessage, DHTMessagePUT, DHTMessageGET, DHTMessageGET_REPLY
+from helpers.messageParser import DHTMessage, DHTMessagePUT, DHTMessageGET, DHTMessageGET_REPLY, DHTMessageTRACE
 from helpers.messageDefinitions import *
 
 class ApiServer(asyncio.Protocol):
@@ -58,6 +58,9 @@ class ApiServer(asyncio.Protocol):
         elif isinstance(api_message, DHTMessageGET):
             yield from self.handle_dht_get(api_message)
 
+        elif isinstance(api_message, DHTMessageTRACE):
+            yield from self.handle_dht_trace(api_message)
+
         else:
             # Command not supported
             self.log.error("Requested command not supported.")
@@ -82,6 +85,8 @@ class ApiServer(asyncio.Protocol):
     @asyncio.coroutine
     def handle_dht_get(self, api_message):
         assert isinstance(api_message, DHTMessageGET)
+        # TEST TRACE
+        yield from self.handle_dht_trace(api_message)
 
         key = api_message.get_key()
 
@@ -95,6 +100,13 @@ class ApiServer(asyncio.Protocol):
             print("array for transport is: ", reply.get_data())
             self.transport.write(reply.get_data())
         self.transport.write_eof()
+
+    @asyncio.coroutine
+    def handle_dht_trace(self, api_message):
+        # assert isinstance(api_message, DHTMessageTRACE)
+        key = api_message.get_key()
+        print("Trace key: ", key)
+        dht_result = yield from self.node.get_trace(key)
 
     def test_generate_dht_put(self):
         buffer = bytearray(30)
