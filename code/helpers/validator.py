@@ -1,32 +1,85 @@
-SCHEMA_TEST = {
+SCHEMA_RPC = {}
+SCHEMA_RPC["rpc_dht_put_data"] = {
     "type" : "object",
      "properties" : {
-        "price" : {"type" : "number"},
-         "name" : {"type" : "string"},
+        "status" : {"type" : "integer"},
+        "message" : {"type" : "string"}
      },
+     "required": ["status"]
+
 }
 
-SCHEMA_UPDATE_PREDECESSOR = {
+SCHEMA_RPC["rpc_dht_get_data"] = {
+    "type" : "object",
+     "properties" : {
+        "status" : {"type" : "integer"},
+        "data" : {"type" : "string"}
+     },
+     "required": ["node_id", "node_address"]
+}
+
+#  rpc_find_successor_rec: {'trace': [], 'node_address': 'tcp://127.0.0.1:1339/0', 'node_id': 8}
+SCHEMA_RPC["rpc_find_successor_rec"] = {
+    "type" : "object",
+     "properties" : {
+        "node_id" : {"type" : "number"},
+        "node_address" : {"type" : "string"}
+     },
+     "required": ["node_id", "node_address"]
+}
+
+SCHEMA_RPC["rpc_update_predecessor"] = {
     "type" : "object",
      "properties" : {
         "node_id" : {"type" : "number"},
         "node_address" : {"type" : "string"},
-     },
+        "old_predecessor" : {
+            "type" : "object",
+            "optional":  "TRUE",
+            "properties" : {
+                    "node_id" : {"type" : "number"},
+                    "node_address" : {"type" : "string"},
+                    "status" : {"type" : "number"}
+
+            },
+            "required": ["node_id", "node_address"]
+        }
+     }
 }
 
-SCHEMA_RPC_PUT_DATA = {
-    "type" : "object",
+SCHEMA_RPC["rpc_get_node_info"] = {
+     "type" : "object",
      "properties" : {
-        "data" : {"type" : "string"},
-     },
+
+        "node_id" : {"type" : "number"},
+        "node_address" : {"type" : "string",},
+        "successor" :  {
+            "type" : "object",
+            "optional": "True",
+            "properties" : {
+                "node_id" : {"type" : "number"},
+                "node_address" : {"type" : "string"},
+
+            },
+            "required": ["node_id", "node_address"]
+        },
+        "predecessor" : {
+            "type" : "object",
+            "optional":  "TRUE",
+            "properties" : {
+                "node_id" : {"type" : "number"},
+                "node_address" : {"type" : "string"}
+            },
+            "required": ["node_id", "node_address"]
+        }
+     }
 }
 
+SCHEMA_RPC["rpc_update_finger_table"] = {}
+SCHEMA_RPC["rpc_update_successor"] = {}
+SCHEMA_RPC["rpc_get_fingertable"] = {}
 
-
-SCHEMA_RPC = {}
-
-#SCHEMA_RPC[]
-
+# SCHEMA_RPC[]
 # Schema for the DHT messages constructed in messageParser.py
 #
 # Note: As the bytes do not allow greater values for integers etc, this is pretty useless at the moment.

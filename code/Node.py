@@ -6,11 +6,11 @@ import aiomas
 import hashlib
 import logging
 import errno
-
+from jsonschema.exceptions import ValidationError, SchemaError
 from helpers.storage import Storage
 from helpers.replica import Replica
 from helpers.messageDefinitions import *
-from jsonschema import validate
+from jsonschema import validate, Draft3Validator
 from helpers.validator import *
 
 CHORD_FINGER_TABLE_SIZE = 8 # TODO: 256
@@ -704,13 +704,16 @@ class Node(aiomas.Agent):
     def run_rpc_safe(self, remote_address, func_name, *args, **kwargs):
         data = None
         err = 1
+
+
         try:
-            #print("Before container.connect()")
             fut_peer = self.container.connect(remote_address)
             remote_peer = yield from asyncio.wait_for(fut_peer, timeout=self.network_timeout)
             #print("After connect()")
             # Invoke remote function
             data = yield from getattr(remote_peer, func_name)(*args, **kwargs)
+            validate(data, SCHEMA_RPC[func_name]) # validata schema
+
             err = 0
 
         except (asyncio.TimeoutError, asyncio.CancelledError) as e:
@@ -730,9 +733,19 @@ class Node(aiomas.Agent):
             err = errno.ECOMM
             self.log.warn("Error connecting to %s", remote_address)
 
-        except Exception:
+        except ValidationError as ex:
             err = 1
-            self.log.error("Unhandled error during RPC to %s", remote_address)
+            self.log.error("Schema validation error: %s", str(ex))
+            traceback.print_exc()
+
+        except SchemaError as ex:
+            err = 1
+            self.log.error("Schema validation error: %s", str(ex))
+            traceback.print_exc()
+
+        except Exception as er:
+            err = 1
+            self.log.error("Unhandled error during RPC function %s to %s: %s", func_name, remote_address, er)
             traceback.print_exc()
 
         return data, err
@@ -750,8 +763,6 @@ class Node(aiomas.Agent):
     def rpc_update_predecessor(self, remote_node):
         if not isinstance(remote_node, dict):
             raise TypeError('Invalid type in argument.')
-
-        validate(remote_node, SCHEMA_UPDATE_PREDECESSOR) # validata schema
 
         remote_id = remote_node["node_id"]
         remote_addr = remote_node["node_address"]
@@ -773,9 +784,6 @@ class Node(aiomas.Agent):
     @aiomas.expose
     def rpc_update_successor(self, node_hint):
 
-        self.log.debug("JSON4 rpc_update_successor   % s  " %  str(node_hint))
-
-
         if not isinstance(node_hint, dict):
             raise TypeError('Invalid type in argument.')
 
@@ -784,8 +792,6 @@ class Node(aiomas.Agent):
     @aiomas.expose
     def rpc_update_finger_table(self, origin_node, i):
 
-        self.log.debug("JSON4 rpc_update_finger_table   % s  " %  str(origin_node))
-
         # TODO: Update finger table
         yield from self.update_finger_table(origin_node, i)
         return True
@@ -793,15 +799,12 @@ class Node(aiomas.Agent):
     @aiomas.expose
     def rpc_find_successor_rec(self, node_id, with_neighbors=False, tracing=False):
 
-        self.log.debug("JSON4 rpc_find_successor_rec % s  " %  str(node_id))
         # TODO: validate params to prevent attacks!
         res = yield from self.find_successor_rec(node_id, with_neighbors=with_neighbors, tracing=tracing)
         return res
 
     @aiomas.expose
     def rpc_get_closest_preceding_finger(self, node_id):
-
-        self.log.debug("JSON4 rpc_get_closest_preceding_finger   % s  " %   str(node_id))
 
         # TODO: validate params to prevent attacks!
         res = yield from self.get_closest_preceding_finger(node_id)
@@ -810,8 +813,6 @@ class Node(aiomas.Agent):
     ### RPC Data storage ###
     @aiomas.expose
     def rpc_dht_put_data(self, key, data, ttl):
-
-        self.log.debug("JSON4 rpc_dht_put_data   % s  " %   str(data))
 
         # TODO: validate
         if in_interval(key, self.predecessor["node_id"], self.id, inclusive_right=True):
