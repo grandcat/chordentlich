@@ -10,7 +10,8 @@ import errno
 from helpers.storage import Storage
 from helpers.replica import Replica
 from helpers.messageDefinitions import *
-from jsonschema import validate
+from jsonschema import validate, Draft3Validator
+from jsonschema.exceptions import ValidationError, SchemaError
 from helpers.validator import *
 
 CHORD_FINGER_TABLE_SIZE = 8 # TODO: 256
@@ -166,7 +167,7 @@ class Node(aiomas.Agent):
         successor, status = yield from self.run_rpc_safe(self.bootstrap_address, "rpc_find_successor_rec",
                                                          self.fingertable[0]["start"])
         # print("Looking for %s" % self.fingertable[0]["start"])
-        self.fingertable[0]["successor"] = strip_node_response(successor)  # TODO: validate successor
+        self.fingertable[0]["successor"] = successor  # TODO: validate successor
         self.print_finger_table()
 
         # Fix references of our direct neighbors
@@ -192,7 +193,7 @@ class Node(aiomas.Agent):
                 finger_successor, status = yield from self.run_rpc_safe(self.bootstrap_address, "rpc_find_successor_rec",
                                                                         finger_next["start"])
                 self.log.info("Node for %d: %s", finger_next["start"], finger_successor)
-                finger_next["successor"] = strip_node_response(finger_successor)
+                finger_next["successor"] = finger_successor
 
         # Optimization for joining node (if not bootstrap node)
         # - Find close node to myself (e.g., successor)
@@ -239,7 +240,7 @@ class Node(aiomas.Agent):
             self.log.info("For finger %d: origin_node is %s; successor was %s",
                           i, origin_node, self.fingertable[i]["successor"]["node_id"])
 
-            self.fingertable[i]["successor"] = strip_node_response(origin_node)
+            self.fingertable[i]["successor"] = origin_node
             # Only forward to predecessor if it is not the peer that started this update cascade
             if self.predecessor["node_id"] != origin_node["node_id"]:
                 yield from self.run_rpc_safe(self.predecessor["node_address"],
@@ -275,7 +276,7 @@ class Node(aiomas.Agent):
         if update_pred["node_address"] == self.node_address and "old_predecessor" in update_pred:
             # Use successor node if chord overlay only has bootstrap node as only one
             # TODO: check whether predecessor is before our ID
-            self.predecessor = strip_node_response(update_pred["old_predecessor"])
+            self.predecessor = update_pred["old_predecessor"]
             self.log.info("Set predecessor: %s", self.predecessor)
 
             # Notify our predecessor to be aware of us (new immediate successor)
@@ -287,7 +288,7 @@ class Node(aiomas.Agent):
             # Stabilize:
             # Seems as our successor reference is not correct anymore.
             # We trust our original successor that it tells the truth in this case.
-            self.fingertable[0]["successor"] = strip_node_response(update_pred)
+            self.fingertable[0]["successor"] = update_pred
             self.log.info("Periodic fix: updated successor reference to node %d (%s)",
                           update_pred["node_id"], update_pred["node_address"])
 
@@ -331,7 +332,7 @@ class Node(aiomas.Agent):
 
             if old_successor_view["predecessor"]["node_address"] == new_node["node_address"]:
                 # Update finger table to point to new immediate successor
-                self.fingertable[0]["successor"] = strip_node_response(new_node)
+                self.fingertable[0]["successor"] = new_node
                 self.log.info("Updated successor reference to node %d (%s)",
                               new_node["node_id"], new_node["node_address"])
 
@@ -454,29 +455,25 @@ class Node(aiomas.Agent):
         """
         successor = self.fingertable[0]["successor"]
         if in_interval(node_id, self.id, successor["node_id"], inclusive_right=True):
-            # Check live of successor node and augment its information with successor and predecessor links
-            # if required
+            # Augment node with infos about its successor (and its predecessor)
+            # This also allows to check whether this node is still alive
+            # TODO: also do live check if no details are needed
             successor_details = successor.copy()
-            successor_neighborhood, status = yield from self.run_rpc_safe(successor["node_address"], "rpc_get_node_info")
-            if status == 0:
-                # Successor node is alive
-                if with_neighbors:
-                    successor_details.update(successor_neighborhood)
-
-                successor_details["status"] = 0
-            else:
-                # Successor node is dead
-                successor_details.update({"status": 1, "message": "last hop not responding"})
+            if with_neighbors:
+                # TODO: validation
+                successor_details, status = yield from self.run_rpc_safe(successor["node_address"], "rpc_get_node_info")
+                if status != 0:
+                    successor_details.update({"status": 1, "message": "last hop not responding"})
 
             # Add list for tracing (last hop is already included in the return message)
             if tracing:
-                successor_details["trace"] = [successor]
+                successor_details["trace"] = []
 
             return successor_details
 
         else:
-            # Find closest finger to node_id and forward recursive query.
-            # If the current finger's node does not respond, try a less optimal one -> requires more hops.
+            # Find closest finger to node_id and forward recursive query
+            # If the current finger's node does not respond, choose a less optimal one.
             # TODO: remember faulty nodes and replace if it happens too often
             this_node = self.as_dict()
             i = 1
@@ -496,8 +493,6 @@ class Node(aiomas.Agent):
                     # the way back.
                     # The preceding node inserts its next hop in the trace. This provides a basic protection that a
                     # malicious node cannot prevent being visible in the list.
-                    # Regarding the order, the goal peer is at position 0 in the list and the first hop from the sender
-                    # is at the last position n-1 (n describes all involved nodes).
                     if tracing:
                         if peer_data is None:
                             peer_data = {"status": 1, "message": "trace incomplete."}
@@ -514,6 +509,22 @@ class Node(aiomas.Agent):
             # Already reached end of unique peers in our finger table: we are isolated right now
             self.log.info("No suitable alternatives as next hop.")
             return {"status": 1, "message": "no suitable alternatives found, giving up."}
+
+    # @asyncio.coroutine
+    # def find_successor_rec(self, node_id):
+    #     """ Iterative find successor
+    #
+    #     .. warning::
+    #        Deprecated: use recursive :func:`find_successor_rec` instead.
+    #     """
+    #     successor = self.fingertable[0]["successor"]
+    #     if in_interval(node_id, self.id, successor["node_id"], inclusive_right=True):
+    #         return successor
+    #     else:
+    #         node = yield from self.find_predecessor(node_id)
+    #         print("[find_successor_rec] Calculated node for %d: %s" % (node_id, node))
+    #         return node["successor"]  # Attention: relies on available successor information which has to be
+    #                                   # retrieved by closest_preceding_finger()
 
     @asyncio.coroutine
     def find_predecessor(self, node_id):
@@ -683,27 +694,13 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def get_trace(self, key):
-        """Information about the hops involved in the path for the lookup of the given ``key``.
-
-        The list is in reverse order:
-        The target peer is at index 0. The node that started the request, is at the last position.
-
-        :param key:
-            Node ID to lookup.
-        :return:
-            Array with dicts containing the address information of all involved hops.
-        """
         nodes = yield from self.find_successor_trace(key)
         print("Get_trace result:", nodes)
-        trace_list = nodes["trace"]
 
-        # Add our self as last hop to the list
-        trace_list.append(self.as_dict())
+        print("Hop 0: node %s", nodes["node_id"])
+        for hop_index, node in enumerate(nodes["trace"]):
+            print("Hop %d : node %s" % (hop_index, node))
 
-        for hop_index, node in enumerate(trace_list):
-            print("Hop %d : node %s" % (len(trace_list) - hop_index - 1, node))
-
-        return trace_list
 
     ##########################################################################
     ### RPC wrappers and functions for maintaining Chord's network overlay ###
@@ -737,9 +734,19 @@ class Node(aiomas.Agent):
             err = errno.ECOMM
             self.log.warn("Error connecting to %s", remote_address)
 
-        except Exception:
+        except ValidationError as ex:
             err = 1
-            self.log.error("Unhandled error during RPC to %s", remote_address)
+            self.log.error("Schema validation error: %s", str(ex))
+            traceback.print_exc()
+
+        except SchemaError as ex:
+            err = 1
+            self.log.error("Schema validation error: %s", str(ex))
+            traceback.print_exc()
+
+        except Exception as ex:
+            err = 1
+            self.log.error("Unhandled error during RPC function %s to %s: %s", func_name, remote_address, ex)
             traceback.print_exc()
 
         return data, err
@@ -780,9 +787,6 @@ class Node(aiomas.Agent):
     @aiomas.expose
     def rpc_update_successor(self, node_hint):
 
-        self.log.debug("JSON4 rpc_update_successor   % s  " %  str(node_hint))
-
-
         if not isinstance(node_hint, dict):
             raise TypeError('Invalid type in argument.')
 
@@ -791,8 +795,6 @@ class Node(aiomas.Agent):
     @aiomas.expose
     def rpc_update_finger_table(self, origin_node, i):
 
-        self.log.debug("JSON4 rpc_update_finger_table   % s  " %  str(origin_node))
-
         # TODO: Update finger table
         yield from self.update_finger_table(origin_node, i)
         return True
@@ -800,26 +802,13 @@ class Node(aiomas.Agent):
     @aiomas.expose
     def rpc_find_successor_rec(self, node_id, with_neighbors=False, tracing=False):
 
-        self.log.debug("JSON4 rpc_find_successor_rec % s  " %  str(node_id))
         # TODO: validate params to prevent attacks!
         res = yield from self.find_successor_rec(node_id, with_neighbors=with_neighbors, tracing=tracing)
         return res
 
-    # @aiomas.expose
-    # def rpc_get_closest_preceding_finger(self, node_id):
-    #
-    #     self.log.debug("JSON4 rpc_get_closest_preceding_finger   % s  " %   str(node_id))
-    #
-    #     # TODO: validate params to prevent attacks!
-    #     res = yield from self.get_closest_preceding_finger(node_id)
-    #     return res
-
     ### RPC Data storage ###
     @aiomas.expose
     def rpc_dht_put_data(self, key, data, ttl):
-
-        self.log.debug("JSON4 rpc_dht_put_data   % s  " %   str(data))
-
         # TODO: validate
         if in_interval(key, self.predecessor["node_id"], self.id, inclusive_right=True):
             self.storage.put(key, data, ttl=ttl)
