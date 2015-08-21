@@ -42,7 +42,7 @@ def in_interval(search_id, node_left, node_right, inclusive_left=False, inclusiv
                (search_id < min(node_left, node_right))
 
 
-def strip_node_response(data, immediate_neighbors=False, trace_log=False):
+def filter_node_response(data, immediate_neighbors=False, trace_log=False):
     if data is None:
         return None
 
@@ -51,9 +51,9 @@ def strip_node_response(data, immediate_neighbors=False, trace_log=False):
         "node_address": data["node_address"]
     }
     if immediate_neighbors and "successor" in data:
-        output["successor"] = strip_node_response(data["successor"])
+        output["successor"] = filter_node_response(data["successor"])
     if immediate_neighbors and "predecessor" in data:
-        output["predecessor"] = strip_node_response(data["predecessor"])
+        output["predecessor"] = filter_node_response(data["predecessor"])
     if trace_log:
         output["trace"] = data["trace"]
 
@@ -167,7 +167,7 @@ class Node(aiomas.Agent):
         successor, status = yield from self.run_rpc_safe(self.bootstrap_address, "rpc_find_successor_rec",
                                                          self.fingertable[0]["start"])
         # print("Looking for %s" % self.fingertable[0]["start"])
-        self.fingertable[0]["successor"] = successor  # TODO: validate successor
+        self.fingertable[0]["successor"] = filter_node_response(successor)  # TODO: validate successor
         self.print_finger_table()
 
         # Fix references of our direct neighbors
@@ -193,7 +193,7 @@ class Node(aiomas.Agent):
                 finger_successor, status = yield from self.run_rpc_safe(self.bootstrap_address, "rpc_find_successor_rec",
                                                                         finger_next["start"])
                 self.log.info("Node for %d: %s", finger_next["start"], finger_successor)
-                finger_next["successor"] = finger_successor
+                finger_next["successor"] = filter_node_response(finger_successor)
 
         # Optimization for joining node (if not bootstrap node)
         # - Find close node to myself (e.g., successor)
@@ -240,7 +240,7 @@ class Node(aiomas.Agent):
             self.log.info("For finger %d: origin_node is %s; successor was %s",
                           i, origin_node, self.fingertable[i]["successor"]["node_id"])
 
-            self.fingertable[i]["successor"] = origin_node
+            self.fingertable[i]["successor"] = filter_node_response(origin_node)
             # Only forward to predecessor if it is not the peer that started this update cascade
             if self.predecessor["node_id"] != origin_node["node_id"]:
                 yield from self.run_rpc_safe(self.predecessor["node_address"],
@@ -276,7 +276,7 @@ class Node(aiomas.Agent):
         if update_pred["node_address"] == self.node_address and "old_predecessor" in update_pred:
             # Use successor node if chord overlay only has bootstrap node as only one
             # TODO: check whether predecessor is before our ID
-            self.predecessor = update_pred["old_predecessor"]
+            self.predecessor = filter_node_response(update_pred["old_predecessor"])
             self.log.info("Set predecessor: %s", self.predecessor)
 
             # Notify our predecessor to be aware of us (new immediate successor)
@@ -288,7 +288,7 @@ class Node(aiomas.Agent):
             # Stabilize:
             # Seems as our successor reference is not correct anymore.
             # We trust our original successor that it tells the truth in this case.
-            self.fingertable[0]["successor"] = update_pred
+            self.fingertable[0]["successor"] = filter_node_response(update_pred)
             self.log.info("Periodic fix: updated successor reference to node %d (%s)",
                           update_pred["node_id"], update_pred["node_address"])
 
@@ -332,7 +332,7 @@ class Node(aiomas.Agent):
 
             if old_successor_view["predecessor"]["node_address"] == new_node["node_address"]:
                 # Update finger table to point to new immediate successor
-                self.fingertable[0]["successor"] = new_node
+                self.fingertable[0]["successor"] = filter_node_response(new_node)
                 self.log.info("Updated successor reference to node %d (%s)",
                               new_node["node_id"], new_node["node_address"])
 
@@ -387,7 +387,7 @@ class Node(aiomas.Agent):
         elif successor != cur_finger["successor"]:
             self.log.info("Finger %d updated: successor is now %s (old: %s)",
                           finger_id, successor, cur_finger["successor"])
-            cur_finger["successor"] = successor
+            cur_finger["successor"] = filter_node_response(successor)
         # else:
         #     self.log.warn("Received successor for finger %d not fitting to ID ranges in finger table: %d not in [%d, %d)",
         #                   finger_id, successor["node_id"], cur_finger["start"], next_finger["start"])
@@ -427,7 +427,7 @@ class Node(aiomas.Agent):
             self.log.warn("Could not resolve responsible peer. Err: %s", result)
             result = None
 
-        result = strip_node_response(result, immediate_neighbors=with_neighbors)
+        result = filter_node_response(result, immediate_neighbors=with_neighbors)
         return result
 
     @asyncio.coroutine
@@ -438,7 +438,7 @@ class Node(aiomas.Agent):
         :return:
         """
         result = yield from self.find_successor_rec(node_id, tracing=True)
-        result = strip_node_response(result, trace_log=True)
+        result = filter_node_response(result, trace_log=True)
         return result
 
     @asyncio.coroutine
@@ -697,7 +697,6 @@ class Node(aiomas.Agent):
         nodes = yield from self.find_successor_trace(key)
         print("Get_trace result:", nodes)
 
-        print("Hop 0: node %s", nodes["node_id"])
         for hop_index, node in enumerate(nodes["trace"]):
             print("Hop %d : node %s" % (hop_index, node))
 
@@ -736,16 +735,19 @@ class Node(aiomas.Agent):
 
         except ValidationError as ex:
             err = 1
+            data = None
             self.log.error("Schema validation error: %s", str(ex))
             traceback.print_exc()
 
         except SchemaError as ex:
             err = 1
+            data = None
             self.log.error("Schema validation error: %s", str(ex))
             traceback.print_exc()
 
         except Exception as ex:
             err = 1
+            data = None
             self.log.error("Unhandled error during RPC function %s to %s: %s", func_name, remote_address, ex)
             traceback.print_exc()
 
@@ -833,23 +835,6 @@ class Node(aiomas.Agent):
             return {
                 "status": 1
             }
-    @asyncio.coroutine
-    def test_stresstest(self, message):
-
-        message = "ok"
-
-        # force some exceptions
-        try:
-            yield from self.rpc_update_predecessor({"node_id": 213}) # missing node address
-        except Exception as e:
-            message = str(e)
-
-        return message.encode("utf-8")
-
-        # if message == TESTMESSAGES_MESSAGE_FAKE_WRONGVALUE:
-        #     return "test wrong value ok".encode("utf-8")
-        # if message == TESTMESSAGES_MESSAGE_FAKE_MISSINGVALUE:
-        #     return "test missing value ok".encode("utf-8")
 
     ### RPC tests ###
     @asyncio.coroutine
@@ -872,3 +857,21 @@ class Node(aiomas.Agent):
         remote_agent = yield from self.container.connect(addr)
         res_node = yield from remote_agent.rpc_find_successor_rec(self.id + 1)
         print("%s got answer from %s: my successor is %s" % (self.node_address, addr, str(res_node)))
+
+    @asyncio.coroutine
+    def test_stresstest(self, message):
+
+        message = "ok"
+
+        # force some exceptions
+        try:
+            yield from self.rpc_update_predecessor({"node_id": 213}) # missing node address
+        except Exception as e:
+            message = str(e)
+
+        return message.encode("utf-8")
+
+        # if message == TESTMESSAGES_MESSAGE_FAKE_WRONGVALUE:
+        #     return "test wrong value ok".encode("utf-8")
+        # if message == TESTMESSAGES_MESSAGE_FAKE_MISSINGVALUE:
+        #     return "test missing value ok".encode("utf-8")
