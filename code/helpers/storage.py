@@ -35,7 +35,7 @@ class Storage:
         """
 
         if not timeOfInsert:
-            timeOfInsert = datetime.datetime.now()
+            timeOfInsert = datetime.datetime.now().time().isoformat()
 
         if ttl>43200:
             raise AttributeError("TTL must be below 43200.")
@@ -167,7 +167,8 @@ class Storage:
             bucket = self.data[bucketKey]
             for key, val in enumerate(bucket):
                 item = bucket[key]
-                if self.timeDiff(item["timeOfInsert"], datetime.datetime.now(), item["ttl"]):
+                timeobj = datetime.datetime.strptime(item["timeOfInsert"], "%H:%M:%S.%f").time()
+                if self.timeDiff(timeobj, datetime.datetime.now(), item["ttl"]):
                     keysToDelete.append(key)
 
             for key in keysToDelete:

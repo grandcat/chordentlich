@@ -24,7 +24,7 @@ class TestStorage(unittest.TestCase):
       self.assertEqual(len(storage.data), 2) # 2 keys in total (a and b)
 
       longTimeAgo = datetime.datetime.today() - datetime.timedelta(2) # insert item from two days ago
-      storage.put("a", "long", timeOfInsert=longTimeAgo) #insert one more item for a which is expired
+      storage.put("a", "long", timeOfInsert=longTimeAgo.time().isoformat()) #insert one more item for a which is expired
 
       self.assertEqual(storage.get("a")[2], "long") # check if expired item was inserted
       self.assertEqual(len(storage.get("a")), 3) # check total items for key a
