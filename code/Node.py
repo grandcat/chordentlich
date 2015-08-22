@@ -49,7 +49,7 @@ class Node(aiomas.Agent):
     class Successor:
         def __init__(self, finger_table_ref):
             self.list = []
-            self.max_entries = 5
+            self.max_entries = 3
 
             self._fingertable = finger_table_ref
 
@@ -65,6 +65,9 @@ class Node(aiomas.Agent):
         def get(self):
             return self.list[0]
 
+        def update(self, successors, ignore_key=-1):
+            self.list = [self.get()] + [x for x in successors if x["node_id"] != ignore_key]
+            del self.list[self.max_entries:]
 
     def __init__(self, container, node_address):
         # Async RPC init
@@ -241,6 +244,11 @@ class Node(aiomas.Agent):
     def init_successor_list(self, successor):
         """Fetch successor list from our immediate successor when joining a network.
         """
+        successor_details, status = yield from self.run_rpc_safe(successor["node_address"], "rpc_get_node_info",
+                                                                 successor_list=True)
+
+        self.successor.update(successor_details["successor_list"], self.id)
+        self.log.info("New successor list: %s", self.successor.list)
 
     @asyncio.coroutine
     def update_finger_table(self, origin_node, i):
