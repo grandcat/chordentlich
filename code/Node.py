@@ -7,38 +7,12 @@ import hashlib
 import logging
 import errno
 from jsonschema.exceptions import ValidationError, SchemaError
+from helpers.validator import *
+from helpers.chordInterval import *
 from helpers.storage import Storage
 from helpers.replica import Replica
 from helpers.messageDefinitions import *
 from jsonschema import validate, Draft3Validator
-from helpers.validator import *
-
-CHORD_FINGER_TABLE_SIZE = 8 # TODO: 256
-CHORD_RING_SIZE = 2**CHORD_FINGER_TABLE_SIZE  # Maximum number of addresses in the Chord network
-
-def in_interval(search_id, node_left, node_right, inclusive_left=False, inclusive_right=False):
-    """
-    Interval checks.
-    """
-    # Special case must not have any manipulation to
-    if node_left != node_right:
-        if inclusive_left:
-            node_left = (node_left - 1) % CHORD_RING_SIZE
-        if inclusive_right:
-            node_right = (node_right + 1) % CHORD_RING_SIZE
-
-    if node_left < node_right:
-        return node_left < search_id < node_right
-    else:
-        # First eq: search area covered is before 0
-        # Second eq: search area covered is after 0
-        #
-        # Special case: node_left == node_right
-        #   This interval is assumed to contain every ID. This is needed if the current network
-        #   only consists of the bootstrap node.
-        #   Example: random_ID is in (249,249]
-        return (search_id > max(node_left, node_right)) or \
-               (search_id < min(node_left, node_right))
 
 
 def strip_node_response(data, immediate_neighbors=False, trace_log=False):
@@ -715,8 +689,8 @@ class Node(aiomas.Agent):
             #print("After connect()")
             # Invoke remote function
             data = yield from getattr(remote_peer, func_name)(*args, **kwargs)
-            validate(data, SCHEMA_RPC[func_name]) # validata schema
 
+            validate(data, SCHEMA_RPC[func_name]) # validata schema
             err = 0
 
         except (asyncio.TimeoutError, asyncio.CancelledError) as e:
@@ -737,19 +711,20 @@ class Node(aiomas.Agent):
             self.log.warn("Error connecting to %s", remote_address)
 
         except ValidationError as ex:
-            err = 1
-            self.log.error("Schema validation error: %s", str(ex))
-            traceback.print_exc()
+            err = 2
+            self.log.error("Validation error: %s", str(ex))
+            data = None
 
         except SchemaError as ex:
             err = 1
+            data = None
             self.log.error("Schema validation error: %s", str(ex))
-            traceback.print_exc()
 
         except Exception as er:
             err = 1
             self.log.error("Unhandled error during RPC function %s to %s: %s", func_name, remote_address, er)
             traceback.print_exc()
+
 
         return data, err
 

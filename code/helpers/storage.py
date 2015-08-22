@@ -9,6 +9,7 @@ multiple entrys per key.
 
 # Storage Class which is called by PUT and GET Operations
 import datetime
+from helpers.chordInterval import *
 
 class Storage:
     """
@@ -16,6 +17,10 @@ class Storage:
     """
     def __init__(self):
         self.data = {}
+
+    def clear(self):
+        self.data = {}
+
     def put(self, key, value, ttl=43200,timeOfInsert=None):
         """Set default attribute values only
 
@@ -36,6 +41,30 @@ class Storage:
             self.data[key] = []
 
         self.data[key].append({"value": value, "timeOfInsert": timeOfInsert, "ttl": ttl})
+
+
+
+    # successor must be included, predecessor must not be included
+    def get_storage_data_between(self, keyOldPredecessor, keyNewPredecessor):
+
+        """Returns a set of storage items between two nodes
+        keyOldPredecessor  ===>  keyNewPredecessor  =====> This Node
+        This Node send all keys from old_predecessor to new predecessor to
+        the new predecessor
+
+        :param keyOldPredecessor: the key of the old predecessor
+        :param keyNewPredecessor: the key of the new predecessor
+        :returns: list of data storage items
+        :rtype: list
+        """
+
+        newset = {}
+        for key in self.data:
+            item = self.data[key]
+            if in_interval(key, keyOldPredecessor, keyNewPredecessor, inclusive_right=True):
+                newset[key] = item
+
+        return newset
 
     def get(self, key):
         """Returns a list of elements for the given key."
