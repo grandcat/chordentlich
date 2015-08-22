@@ -41,7 +41,6 @@ SCHEMA_RPC["rpc_update_predecessor"] = {
         "node_address" : {"type" : "string"},
         "old_predecessor" : {
             "type" : "object",
-            "optional":  "TRUE",
             "properties" : {
                     "node_id" : {"type" : "number"},
                     "node_address" : {"type" : "string"},

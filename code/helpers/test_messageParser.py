@@ -4,8 +4,8 @@
 
 import unittest
 import imp
-from messageParser import *
-from validator import *
+from helpers.messageParser import *
+from helpers.validator import *
 import json
 
 class TestMessageParser(unittest.TestCase):
@@ -15,13 +15,12 @@ class TestMessageParser(unittest.TestCase):
         msg2 = DHTMessage()
         msg2.read_file('helpers/test_messages/DHTPUT')
 
-        print("content is: ", json.dumps(msg2.message.make_dict(), indent=2))
+        #print("content is: ", json.dumps(msg2.message.make_dict(), indent=2))
 
         self.assertEqual( msg2.message.get_content().decode("utf-8"), "HALLO WELT")
         self.assertEqual(msg2.message.get_ttl(), 1)
 
-
-        self.assertEqual(msg2.get_validation_execption(), None)
+        #self.assertEqual(msg2.get_validation_execption(), None)
         #msg2.data[0:2] = int(0).to_bytes(1, byteorder='big')   # make content longer than 64kb, this should throw an exception
 
         msg3 = DHTMessage()

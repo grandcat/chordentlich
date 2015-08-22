@@ -4,16 +4,14 @@
 
 import unittest
 import imp
-from iniParser import IniParser
+from helpers.iniParser import IniParser
 
 class TestIniParser(unittest.TestCase):
 
   def test_property_get(self):
-      inip = IniParser("config.ini")
-
-      self.assertEqual(inip.get("HOSTKEY"), '/hostkey.pem')
+      inip = IniParser("configExample.ini")
       self.assertEqual(inip.get("PORT", "DHT"), '3086')
-      self.assertEqual(inip.get("HOSTNAME", "BOOTSTRAP"), None)
+      self.assertEqual(inip.get("HOSTNAME", "DHT"), "127.0.0.1")
 
 if __name__ == '__main__':
     unittest.main()
