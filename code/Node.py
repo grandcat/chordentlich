@@ -252,6 +252,8 @@ class Node(aiomas.Agent):
             self.predecessor = update_pred["old_predecessor"]
             self.log.info("Set predecessor: %s", self.predecessor)
 
+            self.storage.merge(update_pred["storage"])
+
             # Notify our predecessor to be aware of us (new immediate successor)
             # It might already know. In that case, this call is useless.
             yield from self.run_rpc_safe(self.predecessor["node_address"], "rpc_update_successor",
@@ -753,6 +755,11 @@ class Node(aiomas.Agent):
 
             res = self.predecessor.copy()
             res["old_predecessor"] = old_predecessor
+
+            res["storage"] = self.storage.get_storage_data_between(old_predecessor["node_id"], remote_id) # get storage between old and new node.
+            self.storage.delete_storage_data_between(old_predecessor["node_id"], remote_id) # delete data from our node
+
+            # TODO: delete items from my storage
             return res
         else:
             # No change for this node's predecessor, because it is closer to our node than the asking peer.

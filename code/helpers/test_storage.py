@@ -13,7 +13,6 @@ class TestStorage(unittest.TestCase):
   def test_property_get(self):
       storage = Storage()
 
-
       # insert some keys a and b
       storage.put("a", "a")
       storage.put("b", "b")
@@ -43,6 +42,19 @@ class TestStorage(unittest.TestCase):
       storage2.put(5, 5)
       storage2.put(6, 6)
 
-      self.assertEqual(len (storage2.get_storage_data_between(1,4)) ,3)
+      storage3 = Storage()
+      storage3.put(1, 1)
+      storage3.put(1, 1)
+      storage3.put(1, 1)
+
+      storage2.merge(storage3.data)
+      self.assertEqual(len(storage2.get(1)) ,4)
+      self.assertEqual(len (storage2.get_storage_data_between(1,4)), 3)
+      self.assertEqual(len (storage2.data),6)
+      storage2.delete_storage_data_between(1,4)
+      self.assertEqual(len (storage2.data), 3)
+
+
+
 if __name__ == '__main__':
     unittest.main()

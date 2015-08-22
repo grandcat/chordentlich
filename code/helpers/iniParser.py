@@ -1,15 +1,11 @@
 #!/usr/bin/python3
 
-
-#
-
 """
 Helper class to parse the ini files.
 
 Please note that there is also a python module named configparser. However,
 as the example ini module contanined no section header for the first
 entry (HOSTKEY), we wrote our own
-
 """
 
 class IniParser:
