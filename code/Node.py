@@ -67,11 +67,15 @@ def filter_node_response(data, immediate_neighbors=False, trace_log=False):
 #     def __repr__(self):
 #         return 'Start: ' + str(self.startID) + ', SuccessorID: ' + str(self.successor.nodeId)
 
-
 class Node(aiomas.Agent):
     """
     Node
     """
+
+    class Successor:
+        def __init__(self):
+            self.list = []
+
 
     def __init__(self, container, node_address):
         # Async RPC init
@@ -89,7 +93,7 @@ class Node(aiomas.Agent):
         self.fingertable = []
         self.fix_interval = 7 + random.randint(0, 10)
         self.fix_next = 0
-        # Short-range successor list
+        # Short-range successor list (not including our active successor)
         self.successor_list = []
 
     def as_dict(self, serialize_neighbors=False):
@@ -158,7 +162,9 @@ class Node(aiomas.Agent):
         successor, status = yield from self.run_rpc_safe(self.bootstrap_address, "rpc_find_successor_rec",
                                                          self.fingertable[0]["start"])
         # print("Looking for %s" % self.fingertable[0]["start"])
-        self.fingertable[0]["successor"] = filter_node_response(successor)  # TODO: validate successor
+        successor  = filter_node_response(successor)
+        self.fingertable[0]["successor"] = successor
+        self.successor_list = [successor]
         self.print_finger_table()
 
         # Fix references of our direct neighbors
@@ -205,6 +211,7 @@ class Node(aiomas.Agent):
 
         self.log.info("Default finger table: %s", str(self.fingertable)+"\n\n")
 
+
     def print_finger_table(self, fingerTableToPrint=None):
         if not fingerTableToPrint:
             fingerTableToPrint = self.fingertable
@@ -246,7 +253,7 @@ class Node(aiomas.Agent):
         Update our successor's pointer to reference us as immediate predecessor
         (according to default Chord specification).
         Notify our direct predecessor about our presence. This allows to early stabilize
-        its immediate successor finger[0] early.
+        its immediate successor finger[0].
 
         Requires that finger[0] is set properly.
         """
@@ -255,8 +262,8 @@ class Node(aiomas.Agent):
         # No other peers yet in the network -> no maintenance possible
         if successor["node_id"] == self.id:
             return
-        update_pred, conn_err = yield from self.run_rpc_safe(successor["node_address"],
-                                                             "rpc_update_predecessor", self.as_dict())
+        update_pred, conn_err = yield from self.run_rpc_safe(successor["node_address"], "rpc_update_predecessor",
+                                                             self.as_dict())
         if conn_err != 0:
             # Immediate successor is not responding
             self.log.warn("Immediate successor %s not responding.", successor)
@@ -265,8 +272,8 @@ class Node(aiomas.Agent):
         self.log.debug("Predecessor update result: %s", update_pred)
         # TODO: validate input
         if update_pred["node_address"] == self.node_address and "old_predecessor" in update_pred:
-            # Use successor node if chord overlay only has bootstrap node as only one
-            # TODO: check whether predecessor is before our ID
+            # Successfully integrated into Chord overlay network
+            # Successor already references us at this point.
             self.predecessor = filter_node_response(update_pred["old_predecessor"])
             self.log.info("Set predecessor: %s", self.predecessor)
 
@@ -279,9 +286,20 @@ class Node(aiomas.Agent):
             # Stabilize:
             # Seems as our successor reference is not correct anymore.
             # We trust our original successor that it tells the truth in this case.
-            self.fingertable[0]["successor"] = filter_node_response(update_pred)
-            self.log.info("Periodic fix: updated successor reference to node %d (%s)",
-                          update_pred["node_id"], update_pred["node_address"])
+            new_successor = filter_node_response(update_pred)
+
+            if in_interval(new_successor["node_id"], self.id, successor["node_id"]):
+                self.fingertable[0]["successor"] = new_successor
+                self.log.info("Periodic fix: updated successor reference to node %d (%s)",
+                              new_successor["node_id"], new_successor["node_address"])
+
+                # Notify our new successor to change its predecessor reference to us
+                # If this successor is still not the right one, it will be corrected in the next round.
+                yield from self.run_rpc_safe(new_successor, "rpc_update_predecessor",
+                                             self.as_dict())
+
+            else:
+                self.log.warn("Could not stabilize. Our original successors sends rubbish.")
 
         elif update_pred["node_address"] == self.node_address:
             self.log.info("Successor reference ok. Nothing to do.")
@@ -294,8 +312,7 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def update_successor(self, new_node):
-        """Updates the reference to our immediate successor during periodic maintenance or
-        triggered by other peer's hint.
+        """Updates the reference to our immediate successor triggered by other peer's hint.
 
         A neighboring successor uses this function to notify us about its presence. This ensures
         that the Chord ring is correct.
@@ -314,14 +331,14 @@ class Node(aiomas.Agent):
         if in_interval(new_node["node_id"], self.id, old_successor["node_id"]):
             # Check old successor whether it already accepted new node
             # TODO: validation + timeout catch
-            old_successor_view, peer_err = yield from self.run_rpc_safe(old_successor["node_address"],
-                                                                        "rpc_get_node_info")
+            peer_successor_view, peer_err = yield from self.run_rpc_safe(old_successor["node_address"],
+                                                                         "rpc_get_node_info")
             if peer_err != 0:
                 # Immediate successor is not responding
                 self.log.warn("Immediate successor %s not responding.", old_successor)
                 return  # TODO: better error handling, e.g., update on peer_err > 0
 
-            if old_successor_view["predecessor"]["node_address"] == new_node["node_address"]:
+            if peer_successor_view["predecessor"]["node_address"] == new_node["node_address"]:
                 # Update finger table to point to new immediate successor
                 self.fingertable[0]["successor"] = filter_node_response(new_node)
                 self.log.info("Updated successor reference to node %d (%s)",
@@ -770,7 +787,7 @@ class Node(aiomas.Agent):
     def rpc_get_node_info(self, successor_list=False, additional_data=False):
         node_info = self.as_dict(serialize_neighbors=True)
         if successor_list:
-            node_info["successor_list"] = self.successor_list
+            node_info["successor_list"] = [self.fingertable[0]["successor"]].extend(self.successor_list)
 
         return node_info
 
