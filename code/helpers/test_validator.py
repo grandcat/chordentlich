@@ -4,7 +4,7 @@
 
 import unittest
 import imp
-from validator import *
+from helpers.validator import *
 import datetime
 from jsonschema import validate, Draft3Validator
 from jsonschema.exceptions import ValidationError

@@ -1,15 +1,11 @@
 #!/usr/bin/python3
 
-
-#
-
 """
 Helper class to parse the ini files.
 
 Please note that there is also a python module named configparser. However,
 as the example ini module contanined no section header for the first
 entry (HOSTKEY), we wrote our own
-
 """
 
 class IniParser:
@@ -31,16 +27,17 @@ class IniParser:
 
         with open(filename) as f:
             for line in f:
-                try:
-                    if line != "":
-                        if line.startswith('['):
-                            currentsection = line.strip()[1:-1]
-                            self.data[currentsection] = {}
-                        else:
-                            ar = line.split('=', 1 )
-                            self.data[currentsection][ar[0].strip()] = ar[1].strip()
-                except:
-                    print("NOTE: Could not parse line:", line)
+                if line.strip()!="":
+                    try:
+                        if line != "":
+                            if line.startswith('['):
+                                currentsection = line.strip()[1:-1]
+                                self.data[currentsection] = {}
+                            else:
+                                ar = line.split('=', 1 )
+                                self.data[currentsection][ar[0].strip()] = ar[1].strip()
+                    except:
+                        print("NOTE: Could not parse line:", line)
 
     def get(self, attribute, section=""):
         """
