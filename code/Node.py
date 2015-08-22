@@ -141,7 +141,6 @@ class Node(aiomas.Agent):
             # This is the bootstrap node
             successor_node = self.as_dict()
             self.__generate_fingers(successor_node)
-            # self.predecessor = successor_node  # If removed, easier to replace with checks on update_predecessor
         self.print_finger_table()
 
         # if self.bootstrap_address:
@@ -447,25 +446,29 @@ class Node(aiomas.Agent):
         """
         successor = self.fingertable[0]["successor"]
         if in_interval(node_id, self.id, successor["node_id"], inclusive_right=True):
-            # Augment node with infos about its successor (and its predecessor)
-            # This also allows to check whether this node is still alive
-            # TODO: also do live check if no details are needed
+            # Check live of successor node and augment its information with successor and predecessor links
+            # if required
             successor_details = successor.copy()
-            if with_neighbors:
-                # TODO: validation
-                successor_details, status = yield from self.run_rpc_safe(successor["node_address"], "rpc_get_node_info")
-                if status != 0:
-                    successor_details.update({"status": 1, "message": "last hop not responding"})
+            successor_neighborhood, status = yield from self.run_rpc_safe(successor["node_address"], "rpc_get_node_info")
+            if status == 0:
+                # Successor node is alive
+                if with_neighbors:
+                    successor_details.update(successor_neighborhood)
 
-            # Add list for tracing (last hop is already included in the return message)
+                successor_details["status"] = 0
+            else:
+                # Successor node is dead
+                successor_details.update({"status": 1, "message": "last hop not responding"})
+
+            # Add list for tracing
             if tracing:
-                successor_details["trace"] = []
+                successor_details["trace"] = [successor]
 
             return successor_details
 
         else:
-            # Find closest finger to node_id and forward recursive query
-            # If the current finger's node does not respond, choose a less optimal one.
+            # Find closest finger to node_id and forward recursive query.
+            # If the current finger's node does not respond, try a less optimal one -> requires more hops.
             # TODO: remember faulty nodes and replace if it happens too often
             this_node = self.as_dict()
             i = 1
@@ -485,6 +488,8 @@ class Node(aiomas.Agent):
                     # the way back.
                     # The preceding node inserts its next hop in the trace. This provides a basic protection that a
                     # malicious node cannot prevent being visible in the list.
+                    # Regarding the order, the goal peer is at position 0 in the list and the first hop from the sender
+                    # is at the last position n-1 (n describes all involved nodes).
                     if tracing:
                         if peer_data is None:
                             peer_data = {"status": 1, "message": "trace incomplete."}
@@ -686,11 +691,27 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def get_trace(self, key):
+        """Information about the hops involved in the path for the lookup of the given ``key``.
+
+        The list is in reverse order:
+        The target peer is at index 0. The node that started the request, is at the last position.
+
+        :param key:
+            Node ID to lookup.
+        :return:
+            Array with dicts containing the address information of all involved hops.
+        """
         nodes = yield from self.find_successor_trace(key)
         print("Get_trace result:", nodes)
+        trace_list = nodes["trace"]
 
-        for hop_index, node in enumerate(nodes["trace"]):
-            print("Hop %d : node %s" % (hop_index, node))
+        # Add our self as last hop to the list
+        trace_list.append(self.as_dict())
+
+        for hop_index, node in enumerate(trace_list):
+            print("Hop %d : node %s" % (len(trace_list) - hop_index - 1, node))
+
+        return trace_list
 
 
     ##########################################################################
@@ -746,8 +767,12 @@ class Node(aiomas.Agent):
         return data, err
 
     @aiomas.expose
-    def rpc_get_node_info(self):
-        return self.as_dict(serialize_neighbors=True)
+    def rpc_get_node_info(self, successor_list=False, additional_data=False):
+        node_info = self.as_dict(serialize_neighbors=True)
+        if successor_list:
+            node_info["successor_list"] = self.successor_list
+
+        return node_info
 
     @aiomas.expose
     def rpc_get_fingertable(self):
