@@ -49,10 +49,9 @@ class Node(aiomas.Agent):
     class Successor:
         def __init__(self, finger_table_ref):
             self.list = []
-            self._fingertable = finger_table_ref
+            self.max_entries = 5
 
-        def get(self):
-            return self.list[0]
+            self._fingertable = finger_table_ref
 
         def set(self, new_successor):
             if len(self.list) == 0:
@@ -62,6 +61,9 @@ class Node(aiomas.Agent):
 
             # Maintain first finger to represent correct successor
             self._fingertable[0]["successor"] = new_successor
+
+        def get(self):
+            return self.list[0]
 
 
     def __init__(self, container, node_address):
@@ -126,8 +128,33 @@ class Node(aiomas.Agent):
 
         if self.bootstrap_address:
             # Regular node joining via bootstrap node
+            self.__generate_fingers(None)
+
+            # Try joining later if our successor does not respond
+            successor = None
+            while True:
+                successor, status = yield from self.run_rpc_safe(self.bootstrap_address, "rpc_find_successor_rec",
+                                                                 self.fingertable[0]["start"])
+                if status == 0:
+                    if successor["status"] == 0:
+                        # Successors seems to be reachable: we can proceed
+                        break
+                    else:
+                        self.log.warn("Successor node not responding.")
+                else:
+                    self.log.warn("Bootstrap node not responding.")
+
+                self.log.warn("Retry in 3 seconds.")
+                yield from asyncio.sleep(3)
+
+            # Proceed with a working successor
+            successor = filter_node_response(successor)
+            self.successor.set(successor)
+
+            yield from self.init_successor_list(successor)
             yield from self.init_finger_table()
             yield from self.update_others()
+
         else:
             # This is the bootstrap node
             successor_node = self.as_dict()
@@ -146,17 +173,10 @@ class Node(aiomas.Agent):
     def init_finger_table(self):
         """Generates basic finger table for joining nodes.
         """
-        self.__generate_fingers(None)
-
-        successor, status = yield from self.run_rpc_safe(self.bootstrap_address, "rpc_find_successor_rec",
-                                                         self.fingertable[0]["start"])
-        # print("Looking for %s" % self.fingertable[0]["start"])
-        successor = filter_node_response(successor)
-        # self.fingertable[0]["successor"] = successor
-        self.successor.set(successor)
         self.print_finger_table()
 
-        # Fix references of our direct neighbors
+        # Fix references to our direct neighbors
+        # This is necessary that find_successor works correctly.
         yield from self.update_neighbors()
 
         # Retrieve successor node for each finger 0 -> m-1 (finger 0 is already retrieved from bootstrap node)
@@ -216,6 +236,11 @@ class Node(aiomas.Agent):
             print("Predecessor ID: %d" % self.predecessor["node_id"])
         else:
             print("Predecessor ID: -")
+
+    @asyncio.coroutine
+    def init_successor_list(self, successor):
+        """Fetch successor list from our immediate successor when joining a network.
+        """
 
     @asyncio.coroutine
     def update_finger_table(self, origin_node, i):
@@ -351,7 +376,6 @@ class Node(aiomas.Agent):
             id = (self.id - 2**k) % CHORD_RING_SIZE
             # Find predecessor
             successor = yield from self.find_successor(id, with_neighbors=True)
-            print("TRACE: ", successor)
             p = successor["predecessor"]
             # In rare cases with id exactly matching the node's key, successor is more correct
             # Ex: 116 is looking for node 114 (finger 2), predecessor would be node 249 with successor 114
