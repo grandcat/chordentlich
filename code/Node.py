@@ -721,12 +721,12 @@ class Node(aiomas.Agent):
         data = None
         err = 1
         try:
-            #print("Before container.connect()")
             fut_peer = self.container.connect(remote_address)
             remote_peer = yield from asyncio.wait_for(fut_peer, timeout=self.network_timeout)
-            #print("After connect()")
             # Invoke remote function
             data = yield from getattr(remote_peer, func_name)(*args, **kwargs)
+            # Validate schema
+            validate(data, SCHEMA_RPC[func_name])
             err = 0
 
         except (asyncio.TimeoutError, asyncio.CancelledError) as e:

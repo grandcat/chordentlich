@@ -13,9 +13,15 @@ SCHEMA_RPC["rpc_dht_get_data"] = {
     "type" : "object",
      "properties" : {
         "status" : {"type" : "integer"},
-        "data" : {"type" : "string"}
+        "data" : {
+            "type" : "array",
+            "items":
+                {
+                    "type": "string"
+                }
+        }
      },
-     "required": ["node_id", "node_address"]
+     "required": ["status"]
 }
 
 #  rpc_find_successor_rec: {'trace': [], 'node_address': 'tcp://127.0.0.1:1339/0', 'node_id': 8}
