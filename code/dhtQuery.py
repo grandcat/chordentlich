@@ -25,8 +25,9 @@ if (ipaddress==""):
     ipaddress = "127.0.0.1"
 
 while True:
-    var = input("Do you want to (s)tore or (l)ookup or s(t)tresstest?")
-    if var == "t":
+    var = input("Do you want to (s)tore or (l)ookup?")
+    if var == "t" and False: # disabled right now
+
         print("What kind of stresstest do you want to perform?")
         print("(1) Missing values")
         print("(2) Wrong values")
