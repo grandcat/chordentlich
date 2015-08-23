@@ -25,7 +25,9 @@ for key, val in opts:
 
 projectIni = IniParser(configname)
 ipaddress = projectIni.get("HOSTNAME", "DHT")
-port = int(projectIni.get("PORT", "DHT"))
+port = int(projectIni.get("PORT", ""))
+apiport = int(projectIni.get("PORT", "DHT"))
+
 bootip = projectIni.get("OVERLAY_HOSTNAME", "DHT")
 bootport = projectIni.get("PORT", "BOOTSTRAP")
 hostkey = projectIni.get("HOSTKEY", "")
@@ -56,6 +58,9 @@ else:
 
 print("-------------------")
 
+if apiport==None:
+    apiport = port + 3086
+
 # Testing: First port is bootstrap node
 bootstrap_addr = ("tcp://"+bootip+":" + str(bootport) + "/0") if bootip else None
 print("Address/Port of Bootstrap Node: ", (bootstrap_addr or "this node"))
@@ -65,7 +70,11 @@ print("Bootstrap PORT", bootport)
 print("Boostrap IP", bootip)
 print("Hostkey", hostkey)
 print("Node ID", nodeIdentifier)
+print("API PORT", apiport)
 print("-------------------")
+
+
+
 
 # TODO: parse INI config file here
 
@@ -75,7 +84,7 @@ nodes = [c.spawn(Node) for i in range(1)]
 
 loop = asyncio.get_event_loop()
 # Start API server interface
-api_server = loop.create_server(lambda: ApiServer(nodes[0]), ipaddress, 3086 + port)
+api_server = loop.create_server(lambda: ApiServer(nodes[0]), ipaddress, apiport)
 loop.run_until_complete(api_server)
 # Start DHT node
 loop.run_until_complete(nodes[0].join(bootstrap_address=bootstrap_addr, node_id=nodeIdentifier))
