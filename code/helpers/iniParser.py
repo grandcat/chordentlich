@@ -56,7 +56,7 @@ class IniParser:
                 inip = IniParser("test.ini")
                 inip.get("PORT", "DHT") # returns  123
         """
-        if attribute in  self.data[section]:
+        if section in self.data and attribute in  self.data[section]:
             return self.data[section][attribute]
         else:
             return None
