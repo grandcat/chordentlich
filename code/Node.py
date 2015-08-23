@@ -47,14 +47,15 @@ class Node(aiomas.Agent):
 
             self._fingertable = finger_table_ref
 
-        def set(self, new_successor):
+        def set(self, new_successor, replace_old=False):
             if len(self.list) == 0:
                 self.list = [new_successor]
             else:
                 self.list[0] = new_successor
 
             # Maintain first finger to represent correct successor
-            self._fingertable[0]["successor"] = new_successor
+            self._correct_finger_table(new_successor, replace_old=replace_old)
+            # self._fingertable[0]["successor"] = new_successor
 
         def get(self):
             return self.list[0]
@@ -73,12 +74,26 @@ class Node(aiomas.Agent):
 
         def delete_first(self):
             del self.list[0]
-            # Update referenced finger table
-            self._fingertable[0]["successor"] = self.get()
+            self._correct_finger_table(self.get(), replace_old=True)
 
         def count_occurrence(self, successor):
             # Increase efficiency by using collections.OrderedDict with last=False
             return self.list.count(successor)
+
+        def _correct_finger_table(self, new_successor, replace_old=False, offset=0):
+            old_peer = self._fingertable[offset].get("successor")
+            self._fingertable[offset]["successor"] = new_successor
+
+            if old_peer is None or not replace_old:
+                return
+
+            for entry in self._fingertable[offset+1:]:
+                # if entry["successor"] is None:
+                #     break
+                if entry and entry["successor"].get("node_id") == old_peer["node_id"]:
+                    entry["successor"] = new_successor
+                else:
+                    break
 
         def print_list(self, pre_text="Successor list"):
             print(pre_text)
@@ -467,6 +482,7 @@ class Node(aiomas.Agent):
                                                                          successor_list=True)
                     if status == 0 and "successor_list" in new_successor:
                         # Linking to the new peer being our successor now.
+                        print("-----------------IN status == 0 and successor_list in new_successor")
                         self.successor.set(filter_node_response(new_successor))
                         self.successor.update_others(new_successor["successor_list"])
                         # Successor view must contain at least our previous successor in its list.
