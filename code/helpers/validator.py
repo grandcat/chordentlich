@@ -97,6 +97,14 @@ SCHEMA_INCOMING_RPC["rpc_get_node_info"] = {
         }
      }
 }
+SCHEMA_INCOMING_RPC["rpc_update_finger_table"] = {
+    "type" : "object",
+     "properties" : {
+        "node_id" : {"type" : "number"},
+        "node_address" : {"type" : "string"},
+     },
+    "required": ["node_id", "node_address"]
+}
 
 SCHEMA_OUTGOING_RPC["rpc_update_finger_table"] = {}
 SCHEMA_OUTGOING_RPC["rpc_update_successor"] = {}

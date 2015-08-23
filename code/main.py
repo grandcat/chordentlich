@@ -18,27 +18,36 @@ Main application
 opts, args = getopt.getopt(sys.argv[1:], "I:i:B:b:c:h:")
 
 # Try to load config.ini from parameters
-configname = "config.ini"
+configname = None
+
 for key, val in opts:
     if key == "-c" :
         configname = val
 
-projectIni = IniParser(configname)
-ipaddress = projectIni.get("HOSTNAME", "DHT")
-port = int(projectIni.get("PORT", ""))
-apiport = int(projectIni.get("PORT", "DHT"))
+logfile = None
+hostkey = None
+nodeIdentifier = None
+ipaddress = "localhost"
+apiport = None
+bootip = bootport = None
+if configname:
+    projectIni = IniParser(configname)
+    ipaddress = projectIni.get("HOSTNAME", "DHT")
+    port = int(projectIni.get("PORT", ""))
+    apiport = int(projectIni.get("PORT", "DHT"))
 
-bootip = projectIni.get("OVERLAY_HOSTNAME", "DHT")
-bootport = projectIni.get("PORT", "BOOTSTRAP")
-hostkey = projectIni.get("HOSTKEY", "")
+    bootip = projectIni.get("OVERLAY_HOSTNAME", "DHT")
+    bootport = projectIni.get("PORT", "BOOTSTRAP")
+    hostkey = projectIni.get("HOSTKEY", "")
 
-logfile = projectIni.get("LOG")
+    logfile = projectIni.get("LOG")
 
 if logfile:
     logging.basicConfig(filename=logfile, format='[%(levelname)s:%(funcName)s] %(message)s', level=logging.INFO)
 else:
     logging.basicConfig(format='[%(levelname)s:%(funcName)s] %(message)s', level=logging.INFO)
 
+# Overwrite config definitions with params given by CLI
 for key, val in opts:
     if key == "-I":
         ipaddress = val
@@ -51,14 +60,14 @@ for key, val in opts:
     elif key == "-h":
         hostkey = val
 
-if hostkey != "" and hostkey != None:
+if hostkey is not None and hostkey != "":
     nodeIdentifier = makeSha256FromPem(hostkey)
 else:
     print("WARNING: Hostkey is None")
 
 print("-------------------")
 
-if apiport==None:
+if apiport is None:
     apiport = port + 3086
 
 # Testing: First port is bootstrap node
@@ -72,11 +81,6 @@ print("Hostkey", hostkey)
 print("Node ID", nodeIdentifier)
 print("API PORT", apiport)
 print("-------------------")
-
-
-
-
-# TODO: parse INI config file here
 
 # Define multiple agents per node for accepting RPCs
 c = aiomas.Container((ipaddress, port))

@@ -111,6 +111,7 @@ class Node(aiomas.Agent):
         self.log.info("Node server listening on %s.", node_address)
 
         # Node state
+        self.bootup_finished = False
         self.activated = True
         self.network_timeout = 7
         self.storage = Storage()
@@ -120,6 +121,17 @@ class Node(aiomas.Agent):
         self.fix_next = 0
         # Short-range Successor list (manages finger[0] in fingertable)
         self.successor = Node.Successor(self.fingertable)
+
+    @asyncio.coroutine
+    def _check_running_state(self):
+        """
+        Delay operation if booting process is not finished yet.
+
+        This assures that internal data structures are not accessed before.
+        """
+        while not self.bootup_finished:
+            self.log.info("Delaying request. Bootup not finished.")
+            yield from asyncio.sleep(1)
 
     def as_dict(self, serialize_neighbors=False):
         dict_node = {
@@ -189,6 +201,7 @@ class Node(aiomas.Agent):
 
             yield from self.init_successor_list(successor)
             yield from self.init_finger_table()
+            self.bootup_finished = True
             yield from self.update_others()
 
         else:
@@ -196,6 +209,7 @@ class Node(aiomas.Agent):
             successor_node = self.as_dict()
             self.__generate_fingers(successor_node)
             self.successor.set(successor_node)  # bootstrap first references itself
+            self.bootup_finished = True
 
         self.print_finger_table()
 
@@ -252,7 +266,7 @@ class Node(aiomas.Agent):
             # TODO: add successor if not bootstrap node
             self.fingertable.append(entry)
 
-        self.log.info("Default finger table: %s", str(self.fingertable)+"\n\n")
+        self.log.debug("Default finger table: %s", str(self.fingertable)+"\n\n")
 
 
     def print_finger_table(self, fingerTableToPrint=None):
@@ -855,7 +869,6 @@ class Node(aiomas.Agent):
             # Invoke remote function
             data = yield from getattr(remote_peer, func_name)(*args, **kwargs)
             # Validate schema
-            # TODO: enable again when fail-over handling is working properly
             validate(data, SCHEMA_OUTGOING_RPC[func_name])
             err = 0
 
@@ -943,11 +956,14 @@ class Node(aiomas.Agent):
 
     @aiomas.expose
     def rpc_update_finger_table(self, origin_node, i):
+        yield from self._check_running_state()
+
         origin_node = filter_node_response(origin_node)
+        validate(origin_node, SCHEMA_INCOMING_RPC["rpc_update_finger_table"])
         i = i % CHORD_RING_SIZE
 
         yield from self.update_finger_table(origin_node, i)
-        return True
+        return {"status": 0}
 
     @aiomas.expose
     def rpc_find_successor_rec(self, node_id, with_neighbors=False, tracing=False):
