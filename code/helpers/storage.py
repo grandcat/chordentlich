@@ -61,6 +61,9 @@ class Storage:
                     storage2.merge(storage3.data)
                     # storage2.data now contains all three elements
         """
+        if not dataToMerge:
+            print("[storage:merge] No data to merge.")
+            return
 
         for key in dataToMerge:
             itemsOfKey = dataToMerge[key]
@@ -68,7 +71,7 @@ class Storage:
                 self.data[key] = []
 
             for listItem in itemsOfKey:
-                self.data[key].append(listItem);
+                self.data[key].append(listItem)
 
     # successor must be included, predecessor must not be included
     def get_storage_data_between(self, keyOldPredecessor, keyNewPredecessor):

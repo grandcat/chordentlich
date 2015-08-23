@@ -20,7 +20,7 @@ class TestValidator(unittest.TestCase):
 
 
         instance = {'successor': {'node_id': 78, 'node_address': 'tcp://127.0.0.1:1337/0'}, 'predecessor': {'node_id': 116, 'node_address': 'tcp://127.0.0.1:1338/0'}, 'node_id': 78, 'node_address': 'tcp://127.0.0.1:1337/0'}
-        schema = SCHEMA_RPC["rpc_get_node_info"]
+        schema = SCHEMA_OUTGOING_RPC["rpc_get_node_info"]
         v = Draft3Validator(schema)
         errors = sorted(v.iter_errors(instance), key=lambda e: e.path)
         for error in errors:

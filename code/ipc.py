@@ -87,9 +87,8 @@ class ApiServer(asyncio.Protocol):
     def handle_dht_get(self, api_message):
         assert isinstance(api_message, DHTMessageGET)
         # TEST TRACE
-        #yield from self.handle_dht_trace(api_message)
-        #return
-
+        yield from self.handle_dht_trace(api_message)
+        return
         key = api_message.get_key()
 
         dht_result = yield from self.node.get_data(key)
