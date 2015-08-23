@@ -47,7 +47,7 @@ SCHEMA_OUTGOING_RPC["rpc_find_successor_rec"] = {
             }
         }
     },
-    "required": ["status", "node_id", "node_address"]
+    "required": ["status"]
 }
 
 SCHEMA_OUTGOING_RPC["rpc_update_predecessor"] = {
