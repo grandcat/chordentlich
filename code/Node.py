@@ -153,7 +153,7 @@ class Node(aiomas.Agent):
         return int(hashlib.sha256(address.encode()).hexdigest(), 16) % CHORD_RING_SIZE
 
     @asyncio.coroutine
-    def join(self, node_id=None, node_address=None, bootstrap_address=None):
+    def join(self, node_id=None, node_address=None, bootstrap_address=None, optional_data=None):
         """
         Set ups all internal state variables needed for operation.
         Needs to be called previously to any other function or RPC call.
@@ -174,6 +174,8 @@ class Node(aiomas.Agent):
         self.bootstrap_address = bootstrap_address
         self.predecessor = None
         self.log.info("[Configuration]  node_id: %d, bootstrap_node: %s", self.id, self.bootstrap_address)
+
+        self.optional_trace_data = optional_data or {}
 
         if self.bootstrap_address:
             # Regular node joining via bootstrap node

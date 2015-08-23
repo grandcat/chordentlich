@@ -30,6 +30,7 @@ nodeIdentifier = None
 ipaddress = "localhost"
 apiport = None
 bootip = bootport = None
+kx_port = 0
 if configname:
     projectIni = IniParser(configname)
     ipaddress = projectIni.get("HOSTNAME", "DHT")
@@ -39,6 +40,8 @@ if configname:
     bootip = projectIni.get("OVERLAY_HOSTNAME", "DHT")
     bootport = projectIni.get("PORT", "BOOTSTRAP")
     hostkey = projectIni.get("HOSTKEY", "")
+
+    kx_port = projectIni.get("PORT", "KX")
 
     logfile = projectIni.get("LOG")
 
@@ -80,6 +83,7 @@ print("Boostrap IP", bootip)
 print("Hostkey", hostkey)
 print("Node ID", nodeIdentifier)
 print("API PORT", apiport)
+print("KX PORT", kx_port)
 print("-------------------")
 time.sleep(3)
 
@@ -92,7 +96,7 @@ loop = asyncio.get_event_loop()
 api_server = loop.create_server(lambda: ApiServer(nodes[0]), ipaddress, apiport)
 loop.run_until_complete(api_server)
 # Start DHT node
-loop.run_until_complete(nodes[0].join(bootstrap_address=bootstrap_addr, node_id=nodeIdentifier))
+loop.run_until_complete(nodes[0].join(bootstrap_address=bootstrap_addr, node_id=nodeIdentifier, optional_data={"kx_port": kx_port}))
 loop.run_until_complete(nodes[0].stabilize())
 
 # Test RPC calls within the same node from backup agent 1 to agent 0
