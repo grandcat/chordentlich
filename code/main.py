@@ -13,10 +13,17 @@ from helpers.iniParser import IniParser
 Main application
 """
 
-
 # Parse console arguments
-opts, args = getopt.getopt(sys.argv[1:], "I:i:B:b:")
-projectIni = IniParser("config.ini")
+opts, args = getopt.getopt(sys.argv[1:], "I:i:B:b:c:")
+
+# TODO: config.ini can be
+
+configname = "config.ini"
+if "-c " in opts:
+    configname = opts["-c"]
+    print("Loaded config:", configname)
+
+projectIni = IniParser(configname)
 port_start = -1
 ipaddress = projectIni.get("HOSTNAME", "DHT")
 port = int(projectIni.get("PORT", "DHT"))
