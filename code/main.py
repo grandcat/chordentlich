@@ -17,16 +17,12 @@ Main application
 # Parse console arguments
 opts, args = getopt.getopt(sys.argv[1:], "I:i:B:b:c:h:")
 
-# TODO: config.ini can be
-
+# Try to load config.ini from parameters
 configname = "config.ini"
 for key, val in opts:
     print(key)
     if key == "-c" :
-        print("set config")
         configname = val
-print("Load config:", configname)
-
 
 projectIni = IniParser(configname)
 port_start = -1
@@ -34,17 +30,14 @@ ipaddress = projectIni.get("HOSTNAME", "DHT")
 port = int(projectIni.get("PORT", "DHT"))
 bootip = projectIni.get("HOSTNAME", "BOOTSTRAP")
 bootport = projectIni.get("PORT", "BOOTSTRAP")
-
 hostkey = projectIni.get("HOSTKEY", "")
 
-#logfile = projectIni.get("LOG")
-logfile = None
+logfile = projectIni.get("LOG")
 
 if logfile:
     logging.basicConfig(filename=logfile, format='[%(levelname)s:%(funcName)s] %(message)s', level=logging.INFO)
 else:
     logging.basicConfig(format='[%(levelname)s:%(funcName)s] %(message)s', level=logging.INFO)
-
 
 for key, val in opts:
     if key == "-I":

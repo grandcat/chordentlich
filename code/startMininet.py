@@ -20,11 +20,14 @@ def test():
 
     net.start()
 
-    hosts[0].cmd('xterm -geometry 130x40+0+900 -e  python3 -u main.py -I %s &' % hosts[0].IP())
-
+    hosts[0].cmd('xterm -geometry 130x40+0+900 -e  python3 -u main.py -I %s -c /home/ms/code/mnconfig/1337.ini &' % hosts[0].IP())
+    
+    configname = 1338
     for host in hosts[1:]:
+        
         time.sleep(1)
-        host.cmd('xterm -geometry 130x40+0+900 -e python3 -u main.py -I %s -B %s &' % (host.IP(), hosts[0].IP()))
+        host.cmd('xterm  -geometry 130x40+0+900 -e python3 -u main.py -I %s -c %s &' % (host.IP(), "/home/ms/code/mnconfig/"+str(configname)+".ini"))
+        configname += 1
 
     raw_input('Press enter to stop all nodes.')
     net.stop()
