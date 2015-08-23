@@ -101,6 +101,7 @@ class Node(aiomas.Agent):
             print("----------------------")
             for successor in self.list:
                 print("%s %s" % (str(successor["node_id"]).ljust(9), successor["node_address"]))
+            print("")
 
     def __init__(self, container, node_address):
         # Async RPC init
@@ -169,7 +170,7 @@ class Node(aiomas.Agent):
             will gather the required information to integrate into the Chord network.
         """
         self.id = node_id or self.generate_key(self.node_address)
-        self.node_address = self.node_address or node_address   # normally already set in __init__
+        self.node_address = node_address or self.node_address   # normally already set in __init__
         self.bootstrap_address = bootstrap_address
         self.predecessor = None
         self.log.info("[Configuration]  node_id: %d, bootstrap_node: %s", self.id, self.bootstrap_address)
@@ -282,9 +283,9 @@ class Node(aiomas.Agent):
                 print(str(tableEntry["start"]).ljust(4) + "  -  ")
 
         if self.predecessor:
-            print("Predecessor ID: %d" % self.predecessor["node_id"])
+            print("Predecessor ID: %d \n" % self.predecessor["node_id"])
         else:
-            print("Predecessor ID: -")
+            print("Predecessor ID: - \n")
 
     @asyncio.coroutine
     def init_successor_list(self, successor):
@@ -353,9 +354,9 @@ class Node(aiomas.Agent):
             self.storage.merge(update_pred.get("storage"))
 
         # elif update_pred["node_address"] != self.node_address:
-        #     # Stabilize:
-        #     # Seems as our successor reference is not correct anymore.
-        #     # We trust our original successor that it tells the truth in this case.
+        #     # Fix concurrent joins in the same area:
+        #     # Seems that our successor got a closere predecessor in the mean time.
+        #     # We trust our original successor that it tells the truth and correct our successor reference.
         #     new_successor = filter_node_response(update_pred)
         #
         #     if in_interval(new_successor["node_id"], self.id, successor["node_id"]):
@@ -378,6 +379,8 @@ class Node(aiomas.Agent):
             # Something went wrong during update. This is only relevant if it happened during startup
             # of this node.
             # A new node might have joined in the meantime -> TODO: update our reference or clean exit
+            print("[Update_neighbors] Response:", update_pred)
+            print("[Update_neighbors] Myself:", self.as_dict())
             self.log.error("Could not update predecessor reference of our successor. Try restarting.")
 
     @asyncio.coroutine
@@ -489,19 +492,23 @@ class Node(aiomas.Agent):
                 self.successor.update_others(successor_details["successor_list"], ignore_key=self.id)
                 # Predecessor of a successor can be missing (None)
                 new_successor = successor_details.get("predecessor")
+                print("[update_successor_list] New successor would be:", new_successor)
 
                 if new_successor and in_interval(new_successor["node_id"], self.id, cur_successor["node_id"]):
                     # Our successor already has a different and closer predecessor than us
                     new_successor, status = yield from self.run_rpc_safe(new_successor["node_address"], "rpc_get_node_info",
                                                                          successor_list=True)
+                    print("[update_successor_list] SPECIAL CASE: would move to:", new_successor)
                     if status == 0 and "successor_list" in new_successor:
                         # Linking to the new peer being our successor now.
-                        print("-----------------IN status == 0 and successor_list in new_successor")
+                        print("update_successor_list] SPECIAL CASE: moved to new successor")
                         self.successor.set(filter_node_response(new_successor))
-                        self.successor.update_others(new_successor["successor_list"])
+                        self.successor.update_others(new_successor["successor_list"], ignore_key=self.id)
                         # Successor view must contain at least our previous successor in its list.
                         # Otherwise, this peer seems to behave strange
                         if self.successor.count_occurrence(cur_successor) == 0:
+                            self.log.warn("Reverting successor list as new successor does not include previous one. "
+                                          "Looks suspicious to me.")
                             self.successor.revert_update()
 
                 # Notify our successor here to accelerate the stabilization
@@ -746,9 +753,16 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def stabilize(self):
+        yield from self._check_running_state()
+
         while self.activated:
             yield from asyncio.sleep(self.fix_interval)
             self.log.info("Running periodic fix up.")
+
+            print("Current finger table:")
+            self.print_finger_table()
+            self.log.info("[This node] %s", self.as_dict())
+            print("Stored entries: ", len(self.storage.data))
 
             # Assure that successor still references us as immediate predecessor
             yield from self.update_successor_list()
@@ -759,9 +773,6 @@ class Node(aiomas.Agent):
             # Check predecessor and remove reference if wrong
             yield from self.check_predecessor()
 
-            print("Current finger table:")
-            self.print_finger_table()
-            print("Stored entries: ", len(self.storage.data))
 
     @asyncio.coroutine
     def put_data(self, key, data, ttl, replication_count=3):
@@ -915,13 +926,15 @@ class Node(aiomas.Agent):
 
         return node_info
 
-    @aiomas.expose
-    def rpc_get_fingertable(self):
-        # Check: might be critical to be published completely
-        return self.fingertable
+    # @aiomas.expose
+    # def rpc_get_fingertable(self):
+    #     # Check: might be critical to be published completely
+    #     return self.fingertable
 
     @aiomas.expose
     def rpc_update_predecessor(self, remote_node):
+        yield from self._check_running_state()
+
         if not isinstance(remote_node, dict):
             raise TypeError('Invalid type in argument.')
 
@@ -949,6 +962,8 @@ class Node(aiomas.Agent):
 
     @aiomas.expose
     def rpc_update_successor(self, node_hint):
+        yield from self._check_running_state()
+
         if not isinstance(node_hint, dict):
             raise TypeError('Invalid type in argument.')
 
@@ -967,6 +982,7 @@ class Node(aiomas.Agent):
 
     @aiomas.expose
     def rpc_find_successor_rec(self, node_id, with_neighbors=False, tracing=False):
+        yield from self._check_running_state()
 
         # TODO: validate params to prevent attacks!
         res = yield from self.find_successor_rec(node_id, with_neighbors=with_neighbors, tracing=tracing)

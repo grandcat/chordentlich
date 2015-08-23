@@ -81,6 +81,7 @@ print("Hostkey", hostkey)
 print("Node ID", nodeIdentifier)
 print("API PORT", apiport)
 print("-------------------")
+time.sleep(3)
 
 # Define multiple agents per node for accepting RPCs
 c = aiomas.Container((ipaddress, port))

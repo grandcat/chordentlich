@@ -13,5 +13,5 @@ do
 	((port=$startport + $p))
 	echo "Starting node on $port with startport $startport"
 	xfce4-terminal -H -x python3 main.py -c "config/${port}.ini"
-	sleep 0.6
+	sleep 1
 done
