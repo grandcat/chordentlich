@@ -87,8 +87,8 @@ class ApiServer(asyncio.Protocol):
     def handle_dht_get(self, api_message):
         assert isinstance(api_message, DHTMessageGET)
         # TEST TRACE
-        #yield from self.handle_dht_trace(api_message)
-        #return
+        yield from self.handle_dht_trace(api_message)
+        return
         key = api_message.get_key()
 
         dht_result = yield from self.node.get_data(key)
@@ -112,6 +112,8 @@ class ApiServer(asyncio.Protocol):
         for peer in dht_result:
             node_id = peer["node_id"]
             kx_port = 0
+            if "additional_data" in peer:
+                kx_port = peer.get("additional_data", {}).get("kx_port") or 0
 
             host = "0.0.0.0"
             try:

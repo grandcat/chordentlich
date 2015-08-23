@@ -41,7 +41,7 @@ if configname:
     bootport = projectIni.get("PORT", "BOOTSTRAP")
     hostkey = projectIni.get("HOSTKEY", "")
 
-    kx_port = projectIni.get("PORT", "KX")
+    kx_port = int(projectIni.get("PORT", "KX"))
 
     logfile = projectIni.get("LOG")
 
@@ -96,7 +96,7 @@ loop = asyncio.get_event_loop()
 api_server = loop.create_server(lambda: ApiServer(nodes[0]), ipaddress, apiport)
 loop.run_until_complete(api_server)
 # Start DHT node
-loop.run_until_complete(nodes[0].join(bootstrap_address=bootstrap_addr, node_id=nodeIdentifier, optional_data={"kx_port": kx_port}))
+loop.run_until_complete(nodes[0].join(bootstrap_address=bootstrap_addr, node_id=nodeIdentifier, additional_data={"kx_port": kx_port}))
 loop.run_until_complete(nodes[0].stabilize())
 
 # Test RPC calls within the same node from backup agent 1 to agent 0

@@ -134,7 +134,7 @@ class Node(aiomas.Agent):
             self.log.info("Delaying request. Bootup not finished.")
             yield from asyncio.sleep(1)
 
-    def as_dict(self, serialize_neighbors=False):
+    def as_dict(self, serialize_neighbors=False, additional_data=False):
         dict_node = {
             "node_id": self.id,
             "node_address": self.node_address,
@@ -143,6 +143,8 @@ class Node(aiomas.Agent):
             dict_node["successor"] = self.successor.get()
         if serialize_neighbors and self.predecessor:
             dict_node["predecessor"] = self.predecessor
+        if additional_data:
+            dict_node["additional_data"] = self.additional_data
 
         return dict_node
 
@@ -153,7 +155,7 @@ class Node(aiomas.Agent):
         return int(hashlib.sha256(address.encode()).hexdigest(), 16) % CHORD_RING_SIZE
 
     @asyncio.coroutine
-    def join(self, node_id=None, node_address=None, bootstrap_address=None, optional_data=None):
+    def join(self, node_id=None, node_address=None, bootstrap_address=None, additional_data=None):
         """
         Set ups all internal state variables needed for operation.
         Needs to be called previously to any other function or RPC call.
@@ -173,9 +175,9 @@ class Node(aiomas.Agent):
         self.node_address = node_address or self.node_address   # normally already set in __init__
         self.bootstrap_address = bootstrap_address
         self.predecessor = None
-        self.log.info("[Configuration]  node_id: %d, bootstrap_node: %s", self.id, self.bootstrap_address)
+        self.log.info("[Configuration] node_id: %d, bootstrap_node: %s", self.id, self.bootstrap_address)
 
-        self.optional_trace_data = optional_data or {}
+        self.additional_data = additional_data or {}
 
         if self.bootstrap_address:
             # Regular node joining via bootstrap node
@@ -596,11 +598,14 @@ class Node(aiomas.Agent):
             # Check live of successor node and augment its information with successor and predecessor links
             # if required
             successor_details = successor.copy()
-            successor_neighborhood, status = yield from self.run_rpc_safe(successor["node_address"], "rpc_get_node_info")
+            successor_neighborhood, status = yield from self.run_rpc_safe(successor["node_address"], "rpc_get_node_info",
+                                                                          additional_data=tracing)
             if status == 0:
                 # Successor node is alive
                 if with_neighbors:
-                    successor_details.update(successor_neighborhood)
+                    successor_details.update(filter_node_response(successor_neighborhood, immediate_neighbors=True))
+                if tracing and "additional_data" in successor_neighborhood:
+                    successor_details["additional_data"] = successor_neighborhood["additional_data"]
 
                 successor_details["status"] = 0
             else:
@@ -609,7 +614,11 @@ class Node(aiomas.Agent):
 
             # Add list for tracing
             if tracing:
+                last_hop = successor.copy()
+                last_hop.update({"additional_data": successor_details.get("additional_data")})
                 successor_details["trace"] = [successor]
+                # Include our own additional data to be integrated by our preceding hop
+                successor_details["additional_data"] = self.additional_data
 
             return successor_details
 
@@ -640,7 +649,10 @@ class Node(aiomas.Agent):
                     if tracing:
                         if peer_data is None:
                             peer_data = {"status": 1, "message": "trace incomplete."}
-                        peer_data["trace"].append(next_hop)
+
+                        successor_node = next_hop.copy()
+                        successor_node["additional_data"] = peer_data["additional_data"]
+                        peer_data["trace"].append(successor_node)
 
                     return peer_data
 
@@ -859,7 +871,7 @@ class Node(aiomas.Agent):
         trace_list = nodes["trace"]
 
         # Add our self as last hop to the list
-        trace_list.append(self.as_dict())
+        trace_list.append(self.as_dict(additional_data=True))
 
         for hop_index, node in enumerate(trace_list):
             print("Hop %d : node %s" % (len(trace_list) - hop_index - 1, node))
@@ -925,6 +937,8 @@ class Node(aiomas.Agent):
         node_info = self.as_dict(serialize_neighbors=True)
         if successor_list:
             node_info["successor_list"] = self.successor.list
+        if additional_data:
+            node_info["additional_data"] = self.additional_data
 
         return node_info
 
