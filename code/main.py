@@ -20,12 +20,10 @@ opts, args = getopt.getopt(sys.argv[1:], "I:i:B:b:c:h:")
 # Try to load config.ini from parameters
 configname = "config.ini"
 for key, val in opts:
-    print(key)
     if key == "-c" :
         configname = val
 
 projectIni = IniParser(configname)
-port_start = -1
 ipaddress = projectIni.get("HOSTNAME", "DHT")
 port = int(projectIni.get("PORT", "DHT"))
 bootip = projectIni.get("HOSTNAME", "BOOTSTRAP")
@@ -51,18 +49,24 @@ for key, val in opts:
     elif key == "-h":
         hostkey = val
 
-print("LOAD HOSTKEY FROM ", hostkey)
-nodeIdentifier = makeSha256FromPem(hostkey)
-print("NODE KEY IS ", nodeIdentifier)
+if hostkey != "" and hostkey != None:
+    nodeIdentifier = makeSha256FromPem(hostkey)
+else:
+    print("WARNING: Hostkey is None")
 
-print("bootip", bootip)
-print("Port", port)
+print("-------------------")
+
 # Testing: First port is bootstrap node
 bootstrap_addr = ("tcp://"+bootip+":" + str(bootport) + "/0") if bootip else None
 print("Address/Port of Bootstrap Node: ", (bootstrap_addr or "this node"))
+print("Port", port)
 print("-------------------")
-print("port", port)
-print("port_start", port_start)
+print("Bootstrap PORT", bootport)
+print("Boostrap IP", bootip)
+print("Hostkey", hostkey)
+print("Node ID", nodeIdentifier)
+print("-------------------")
+
 # TODO: parse INI config file here
 
 # Define multiple agents per node for accepting RPCs
@@ -74,7 +78,7 @@ loop = asyncio.get_event_loop()
 api_server = loop.create_server(lambda: ApiServer(nodes[0]), ipaddress, 3086 + port)
 loop.run_until_complete(api_server)
 # Start DHT node
-loop.run_until_complete(nodes[0].join(bootstrap_address=bootstrap_addr))
+loop.run_until_complete(nodes[0].join(bootstrap_address=bootstrap_addr, node_id=nodeIdentifier))
 loop.run_until_complete(nodes[0].stabilize())
 
 # Test RPC calls within the same node from backup agent 1 to agent 0
