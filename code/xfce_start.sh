@@ -2,7 +2,7 @@
 killall python3
 sleep 0.5
 
-count=5
+count=3
 startport=1338
 
 xfce4-terminal -H -x  python3 main.py -i 1337 -h "hostkeys/prv1.pem"

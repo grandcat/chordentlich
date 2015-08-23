@@ -97,7 +97,7 @@ class Node(aiomas.Agent):
 
         # Node state
         self.activated = True
-        self.network_timeout = 10
+        self.network_timeout = 7
         self.storage = Storage()
         # Wide-range Overlay network
         self.fingertable = []
