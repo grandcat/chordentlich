@@ -26,7 +26,7 @@ for key, val in opts:
 projectIni = IniParser(configname)
 ipaddress = projectIni.get("HOSTNAME", "DHT")
 port = int(projectIni.get("PORT", "DHT"))
-bootip = projectIni.get("HOSTNAME", "BOOTSTRAP")
+bootip = projectIni.get("OVERLAY_HOSTNAME", "DHT")
 bootport = projectIni.get("PORT", "BOOTSTRAP")
 hostkey = projectIni.get("HOSTKEY", "")
 
