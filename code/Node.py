@@ -252,7 +252,7 @@ class Node(aiomas.Agent):
             # TODO: add successor if not bootstrap node
             self.fingertable.append(entry)
 
-        self.log.info("Default finger table: %s", str(self.fingertable)+"\n\n")
+        self.log.debug("Default finger table: %s", str(self.fingertable)+"\n\n")
 
 
     def print_finger_table(self, fingerTableToPrint=None):

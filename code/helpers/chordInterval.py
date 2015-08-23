@@ -1,4 +1,4 @@
-CHORD_FINGER_TABLE_SIZE = 256 # TODO: 256
+CHORD_FINGER_TABLE_SIZE = 8 # TODO: 256
 CHORD_RING_SIZE = 2**CHORD_FINGER_TABLE_SIZE  # Maximum number of addresses in the Chord network
 
 def in_interval(search_id, node_left, node_right, inclusive_left=False, inclusive_right=False):
