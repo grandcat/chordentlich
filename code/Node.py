@@ -118,7 +118,7 @@ class Node(aiomas.Agent):
         self.storage = Storage()
         # Wide-range Overlay network
         self.fingertable = []
-        self.fix_interval = 7 + random.randint(0, 10)
+        self.fix_interval = 4 + random.randint(0, 5)
         self.fix_next = 0
         # Short-range Successor list (manages finger[0] in fingertable)
         self.successor = Node.Successor(self.fingertable)
@@ -604,8 +604,6 @@ class Node(aiomas.Agent):
                 # Successor node is alive
                 if with_neighbors:
                     successor_details.update(filter_node_response(successor_neighborhood, immediate_neighbors=True))
-                if tracing and "additional_data" in successor_neighborhood:
-                    successor_details["additional_data"] = successor_neighborhood["additional_data"]
 
                 successor_details["status"] = 0
             else:
@@ -615,8 +613,8 @@ class Node(aiomas.Agent):
             # Add list for tracing
             if tracing:
                 last_hop = successor.copy()
-                last_hop.update({"additional_data": successor_details.get("additional_data")})
-                successor_details["trace"] = [successor]
+                last_hop.update({"additional_data": successor_neighborhood.get("additional_data", {}) if successor_neighborhood else {}})
+                successor_details["trace"] = [last_hop]
                 # Include our own additional data to be integrated by our preceding hop
                 successor_details["additional_data"] = self.additional_data
 
@@ -789,10 +787,10 @@ class Node(aiomas.Agent):
 
 
     @asyncio.coroutine
-    def put_data(self, key, data, ttl, replication_count=3):
+    def put_data(self, key, data, ttl, replication_count=-1):
         replica = Replica(CHORD_RING_SIZE)
 
-        keys = replica.get_key_list(key, replication_count)
+        keys = replica.get_key_list(key, replicationCount=replication_count)
 
         print("\n\n\n\nPUT KEYS ARE ", keys)  # [197, 210, 70]
         successes = 0
@@ -827,19 +825,21 @@ class Node(aiomas.Agent):
             }
 
     @asyncio.coroutine
-    def get_data(self, key):
+    def get_data(self, key, replication_count=-1):
         replica = Replica(CHORD_RING_SIZE)
-        keys = replica.get_key_list(key, 1)  # 5 is the replications that are tried before abort
+        keys = replica.get_key_list(key, replicationCount=replication_count)  # 3 is the replications that are tried before abort
 
         for keyWithReplicaIndex in keys:
             storage_node = yield from self.find_successor(keyWithReplicaIndex)
             print("got storage_node:", storage_node)
 
             if storage_node.get("node_id") == self.id:
-                return {
-                    "status": 0,
-                    "data": self.storage.get(keyWithReplicaIndex)
-                }
+                # Note the case that this node received the responsibility for a failed node.
+                # Given that the missing data might not be available on this node, continue the replica loop.
+                result = self.rpc_dht_get_data(keyWithReplicaIndex)
+                print("[rpc_dht_get_data] Result is:", result)
+                if result["status"] == 0:
+                    return result
 
             else:
                 # Directly connect to remote peer and fetch data from there
@@ -934,11 +934,9 @@ class Node(aiomas.Agent):
 
     @aiomas.expose
     def rpc_get_node_info(self, successor_list=False, additional_data=False):
-        node_info = self.as_dict(serialize_neighbors=True)
+        node_info = self.as_dict(serialize_neighbors=True, additional_data=additional_data)
         if successor_list:
             node_info["successor_list"] = self.successor.list
-        if additional_data:
-            node_info["additional_data"] = self.additional_data
 
         return node_info
 
@@ -1025,8 +1023,9 @@ class Node(aiomas.Agent):
     def rpc_dht_get_data(self, key):
         if in_interval(key, self.predecessor["node_id"], self.id, inclusive_right=True):
             data = self.storage.get(key)
+            status = 0 if len(data) > 0 else 1
             return {
-                "status": 0,
+                "status": status,
                 "data": data
             }
         else:

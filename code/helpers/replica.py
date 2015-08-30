@@ -11,8 +11,9 @@ class Replica:
     """
     :param chordRingSize: The Size of the Chord ring. Usually something like 2^256
     """
-    def __init__(self, chordRingSize):
+    def __init__(self, chordRingSize, replicationCount=3):
         self.chordRingSize = chordRingSize
+        self.replicationCount = replicationCount
 
     """Set default attribute values only
 
@@ -34,7 +35,9 @@ class Replica:
     :returns: a list of integer replica keys as
     :rtype: list of type int
     """
-    def get_key_list(self, key, replicationCount):
+    def get_key_list(self, key, replicationCount=-1):
+        replicationCount = self.replicationCount if replicationCount == -1 else replicationCount
+
         indices = []
         for i in range(0, replicationCount):
             indices.append(self.get_key(key, i))
