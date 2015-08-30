@@ -40,6 +40,9 @@ class Node(aiomas.Agent):
     """
 
     class Successor:
+        """
+        List manager for successor modes.
+        """
         def __init__(self, finger_table_ref):
             self.list = []
             self._backup = None     # List backup before ``update_others``
@@ -102,6 +105,7 @@ class Node(aiomas.Agent):
             for successor in self.list:
                 print("%s %s" % (str(successor["node_id"]).ljust(9), successor["node_address"]))
             print("")
+
 
     def __init__(self, container, node_address):
         # Async RPC init
@@ -821,7 +825,7 @@ class Node(aiomas.Agent):
             return {
                 "status": 1,
                 "successes": successes,
-                "messages": "Data could not be saved."
+                "message": "Data could not be saved."
             }
 
     @asyncio.coroutine
