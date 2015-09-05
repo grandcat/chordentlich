@@ -41,7 +41,9 @@ class Node(aiomas.Agent):
 
     class Successor:
         """
-        List manager for successor modes.
+        List manager for successor references.
+
+        It is responsible that entries in the successor list and first finger are consistent.
         """
         def __init__(self, finger_table_ref):
             self.list = []
@@ -154,26 +156,40 @@ class Node(aiomas.Agent):
 
     @staticmethod
     def generate_key(address):
-        # TODO: public key hash instead of protocol + IP address + port
-        # TODO: remove modulo
+        """
+        Generates a node identifier (key) based on the network address for this instance.
+
+        :param address:
+            The network address as string
+
+        :return:
+            Generated node id
+        :rtype: int
+        """
         return int(hashlib.sha256(address.encode()).hexdigest(), 16) % CHORD_RING_SIZE
 
     @asyncio.coroutine
     def join(self, node_id=None, node_address=None, bootstrap_address=None, additional_data=None):
         """
-        Set ups all internal state variables needed for operation.
+        Joins an existing Chord network or creates a new one.
+
+        It set ups all internal state variables needed for operation.
         Needs to be called previously to any other function or RPC call.
 
         :param node_id:
-            optional node ID.
+            Optional node ID.
             If not supplied, it will be generated automatically.
 
         :param node_address:
-            optional node address formatted as an aiomas agent address (IPv4 or IPv6 address)
+            Optional node address formatted as an aiomas agent address (IPv4 or IPv6 address)
 
         :param bootstrap_address:
-            if not given, a new Chord network is created. Otherwise, the new node
+            If not given, a new Chord network is created. Otherwise, the new node
             will gather the required information to integrate into the Chord network.
+
+        :param additional_data:
+            Optional additional data as dict that is added to the trace log if a node calls
+            :func:`find_successor_rec` with tracing enabled.
         """
         self.id = node_id or self.generate_key(self.node_address)
         self.node_address = node_address or self.node_address   # normally already set in __init__
@@ -230,7 +246,7 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def init_finger_table(self):
-        """Generates basic finger table for joining nodes.
+        """Generates a basic finger table for this node joining an existing Chord network.
         """
         self.print_finger_table()
 
@@ -535,8 +551,9 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def check_predecessor(self):
-        """Verifies this node's immediate predecessor's live. If it is lost, remove reference to give new nodes a
-        chance to repair it.
+        """Verifies this node's immediate predecessor's live.
+
+        If it is lost, remove reference to give new nodes a chance to repair it.
         """
         if self.predecessor is None or self.predecessor["node_id"] == self.id:
             return
@@ -558,9 +575,11 @@ class Node(aiomas.Agent):
 
         :param node_id:
             Key ``node_id`` whose responsible successor is interesting.
+
         :param with_neighbors:
             If ``True``, the immediate successor and predecessor nodes augment the result of
             the responsible successor.
+
         :return:
             Responsible successor node for given key ``node_id``.
         :rtype: dict or None
@@ -576,10 +595,14 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def find_successor_trace(self, node_id):
-        """Wrapper for :func:`find_successor_rec` with trace log of intermediate hops.
+        """Wrapper for :func:`find_successor_rec` with trace log enabled for intermediate hops.
 
         :param node_id:
+            Key ``node_id`` whose responsible successor is interesting.
+
         :return:
+            Responsible successor node for given key ``node_id``.
+        :rtype: dict or None
         """
         result = yield from self.find_successor_rec(node_id, tracing=True)
         result = filter_node_response(result, trace_log=True)
@@ -587,13 +610,20 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def find_successor_rec(self, node_id, with_neighbors=False, tracing=False):
-        """Recursive find successor. Used locally and by remote peers.
+        """Recursively locate the responsible node for a given ``node_id`` (key).
+
+        This function is the heart of the Chord DHT.
+        It is used locally and by remote peers.
 
         :param node_id:
             Key ``node_id`` whose responsible successor is interesting.
+
         :param with_neighbors:
             If ``True``, the immediate successor and predecessor nodes augment the result of
             the responsible successor.
+
+            This is useful if the predecessor of the responsible node is needed.
+
         :return:
             Responsible successor node for given key ``node_id``.
         """
@@ -731,6 +761,7 @@ class Node(aiomas.Agent):
 
         :param node_id:
             node ID as an integer.
+
         :param fall_back:
             chooses less optimal finger nodes if value increases.
 
