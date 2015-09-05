@@ -8,7 +8,7 @@ developed for the course `P2P Network Security <http://www.net.in.tum.de/de/lehr
 
 .. _paper: http://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf
 
-For RPC calls the `aiomas`_ library is used which bases on AsyncIO.
+For RPC calls the `aiomas`_ library is used which is based on AsyncIO.
 
 .. _aiomas: https://pypi.python.org/pypi/aiomas/0.5.0
 

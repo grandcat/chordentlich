@@ -94,7 +94,11 @@ class DHTMessage():
 
     def getSize(self):
         """
-        Returns the size of the message in bytes
+        Returns the size of the message
+
+        :returns: Message Size in bytes
+        :rtype: int
+
         """
         return  int.from_bytes( self.data[0:2], byteorder='big')
 
@@ -105,7 +109,9 @@ class DHTMessageParent():
 
 
 class DHTMessagePUT(DHTMessageParent):
-
+    """
+    Provides additional parameters for a DHTMessage which is a PUT message
+    """
     def make_dict(self):
         return {
             "ttl" : self.get_ttl(),
@@ -151,7 +157,9 @@ class DHTMessagePUT(DHTMessageParent):
         return self.data[44:self.size]
 
 class DHTMessageGET(DHTMessageParent):
-
+    """
+    Provides additional parameters for a DHTMessage which is a GET message.
+    """
     def make_dict(self):
         return {
             "key" : self.get_key()
@@ -166,7 +174,9 @@ class DHTMessageGET(DHTMessageParent):
         return int.from_bytes(self.data[4:36], byteorder='big')
 
 class DHTMessageTRACE(DHTMessageParent):
-
+    """
+    Provides additional parameters for a DHTMessage which is a TRACE message.
+    """
     def make_dict(self):
         return {
             "key" : self.get_key()
@@ -182,10 +192,10 @@ class DHTMessageTRACE(DHTMessageParent):
 
 class DHTMessageGET_REPLY:
     """
-    Initializes a DHT_GET_REPLY message to send later.
+    Initializes a ``MSG_DHT_GET_REPLY`` message to send later.
 
     :param key: the key as integer
-    :param content: the content
+    :param content: the content of the get query in binary format.
     """
     def __init__(self, key, content):
         assert type(content) is bytes
@@ -202,11 +212,16 @@ class DHTMessageGET_REPLY:
         self.frame = frame
 
     def get_data(self):
+        """
+        Returns the data in binary format
+
+        :rtype: bytearray
+        """
         return self.frame
 
 class MAKE_MSG_DHT_GET:
     """
-    Initializes a MAKE_MSG_DHT_GET message to send later.
+    Initializes a `MSG_DHT_GET`` message to send later.
 
     :param key: the key as integer
     :param hops: a list of :py:meth:`DHTHop` objects
@@ -226,7 +241,7 @@ class MAKE_MSG_DHT_GET:
 
 class MAKE_MSG_DHT_PUT:
     """
-    Initializes a MSG_DHT_PUT message to send later.
+    Initializes a ``MSG_DHT_PUT`` message to send later.
 
     :param key: key as integer
     :type key: int
@@ -260,7 +275,7 @@ class MAKE_MSG_DHT_PUT:
 
 class MAKE_MSG_DHT_TRACE_REPLY:
     """
-    Initializes a DHT_TRACE_REPLY message to send later.
+    Initializes a ``MSG_DHT_TRACE_REPLY`` message to send later.
 
     :param key: the key as integer
     :param hops: a list of :py:meth:`DHTHop` objects
@@ -282,11 +297,17 @@ class MAKE_MSG_DHT_TRACE_REPLY:
         self.frame = frame
 
     def get_data(self):
+        """
+        Return the binary representation
+
+        :returns: Message in binary format
+        :rtype: bytearray
+        """
         return self.frame
 
 class DHTHop:
     """
-    A DHT Hop for DHT_TRACE_REPLY message
+    A DHT Hop for ``MSG_DHT_TRACE_REPLY`` message
 
     :param peerId: the peer id with a maximum length of 32 bytes
     :type peerId: Int
@@ -309,6 +330,12 @@ class DHTHop:
         self.IPv4Address = ipv4
         self.IPv6Address = ipv6
 
+    """
+    Return the binary representation of a DHT Hop, which can be appended to a DHT TRACE Message
+
+    :returns: DHTHop in binary format
+    :rtype: bytearray
+    """
     def as_bytes(self):
         frame = bytearray()
         frame += self.peerId
@@ -320,6 +347,9 @@ class DHTHop:
         return frame
 
 class DHTMessageERROR:
+    """
+    Generates an error message
+    """
     def __init__(self, requestType, requestKey):
         frame = bytearray()
 
@@ -334,4 +364,10 @@ class DHTMessageERROR:
         self.frame = frame
 
     def get_data(self):
+        """
+        Return the binary representation
+
+        :returns: Message in binary format
+        :rtype: bytearray
+        """
         return self.frame
