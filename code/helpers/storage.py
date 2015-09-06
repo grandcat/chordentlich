@@ -76,10 +76,7 @@ class Storage:
     # successor must be included, predecessor must not be included
     def get_storage_data_between(self, keyOldPredecessor, keyNewPredecessor):
 
-        """Returns a set of storage items between two nodes
-        keyOldPredecessor  ===>  keyNewPredecessor  =====> This Node
-        This Node send all keys from old_predecessor to new predecessor to
-        the new predecessor
+        """Returns a set of storage items between two nodes.
 
         :param keyOldPredecessor: the key of the old predecessor
         :param keyNewPredecessor: the key of the new predecessor
@@ -97,7 +94,7 @@ class Storage:
 
     def delete_storage_data_between(self, keyOldPredecessor, keyNewPredecessor):
 
-        """Delete a set of storage items between two nodes
+        """Delete a set of storage items between two nodes.
         Ususally called if a node has sent some of its content to another node
 
         :param keyOldPredecessor: the key of the old predecessor

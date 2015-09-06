@@ -20,6 +20,11 @@ class IniParser:
         self.read_file(filename)
 
     def read_file(self, filename):
+        """
+        Open a new file and parse it
+        :param filename: The filename
+        :type filename: string
+        """
 
         currentsection = "" # The current seciotn in the parser (like [DHT] for example)
         self.data = {}

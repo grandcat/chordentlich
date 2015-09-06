@@ -15,27 +15,27 @@ class Replica:
         self.chordRingSize = chordRingSize
         self.replicationCount = replicationCount
 
-    """Set default attribute values only
-
-    :param key: the key to be hased as byte array
-    :returns: a hash value which is the location in the chord ring
-    :rtype: int
-    """
     def get_key(self, key, replicaIndex=1):
+        """Set default attribute values only
+
+        :param key: the key to be hased as byte array
+        :returns: a hash value which is the location in the chord ring
+        :rtype: int
+        """
 
         if replicaIndex>0:
             key = self.get_key(key, replicaIndex-1)
 
         return int(hashlib.sha256(key.to_bytes(32, byteorder='big')).hexdigest(), 16) % self.chordRingSize
 
-    """Get a list of replica keys for a given replica key
-
-    :param key: the key to be hased as byte array
-    :type key: bytearray
-    :returns: a list of integer replica keys as
-    :rtype: list of type int
-    """
     def get_key_list(self, key, replicationCount=-1):
+        """Get a list of replica keys for a given replica key
+
+        :param key: the key to be hased as byte array
+        :type key: bytearray
+        :returns: a list of integer replica keys as
+        :rtype: list of type int
+        """
         replicationCount = self.replicationCount if replicationCount == -1 else replicationCount
 
         indices = []

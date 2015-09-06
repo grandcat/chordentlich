@@ -9,6 +9,7 @@ Chord Node
    :members:
 
 
+
 Helpers
 ================
 Helpers are various classes to support the DHT operations
@@ -29,6 +30,21 @@ Helpers are various classes to support the DHT operations
 ---------------------------------------------
 .. automodule:: iniParser
    :members:
+
+:mod:`replica`
+---------------------------------------------
+.. automodule:: replica
+   :members:
+
+
+IPC
+================
+:mod:`ApiServer`
+---------------------------------------------
+.. automodule:: ApiServer
+   :members:
+
+
 
 Tools
 ================
