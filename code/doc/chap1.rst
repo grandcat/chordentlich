@@ -39,9 +39,9 @@ Helpers are various classes to support the DHT operations
 
 IPC
 ================
-:mod:`ApiServer`
+:mod:`ipc`
 ---------------------------------------------
-.. automodule:: ApiServer
+.. automodule:: ipc
    :members:
 
 

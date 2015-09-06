@@ -6,7 +6,11 @@ from helpers.messageParser import *
 from helpers.aiomasTools import aiomas_parse_url
 from helpers.messageDefinitions import *
 
+
 class ApiServer(asyncio.Protocol):
+    """
+        Class to connect to the Chord Node
+    """
     def __init__(self, dht_node):
         self.log = logging.getLogger(__name__)
         self.node = dht_node
