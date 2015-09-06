@@ -800,6 +800,9 @@ class Node(aiomas.Agent):
 
     @asyncio.coroutine
     def stabilize(self):
+        """
+        Stabilize routine
+        """
         yield from self._check_running_state()
 
         while self.activated:
@@ -898,6 +901,7 @@ class Node(aiomas.Agent):
 
         :param key:
             Node ID to lookup.
+
         :return:
             Array with dicts containing the address information of all involved hops.
         """
