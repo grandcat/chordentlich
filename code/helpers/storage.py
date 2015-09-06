@@ -24,13 +24,13 @@ class Storage:
 
     def put(self, key, value, ttl=43200,timeOfInsert=None):
 
-        """Set default attribute values only
+        """Add data to the storage. You can also provide a time to live and specify the time of insert.
 
         :param key: the dht key
         :param value: the dht value
         :todo: Add support for binary keys and values
         :param ttl: time to live in seconds. after this period of seconds the item will be deleted
-        :param timeOfInsert: datetime when the item was inserted. If none is set, we will use the current date.
+        :param timeOfInsert: datetime when the item was inserted. If none is set, we will use the current date. Will be used later to check outdated items.
         :Example: See example of  :py:meth:`get`  method.
         """
 

@@ -30,7 +30,7 @@ DHTCommandsInv = {
 
 class DHTMessage():
     """
-    Base class for other classes parsing incoming data such as as DHTMessagePUT
+    Base class for other classes representing incoming data such as as ``DHTMessagePUT``
     """
     def __init__(self):
         self.message = None
@@ -59,6 +59,8 @@ class DHTMessage():
     def parse(self):
         """
         Parse the message
+
+        ``self.message`` will automatically become the type of message specified with the command number (``DHTMessageGET``, ``DHTMessagePUT`` etc.)
         """
         commandNumber =  int.from_bytes( self.data[2:4], byteorder='big')
         command = DHTCommands[commandNumber]
@@ -331,7 +333,7 @@ class DHTHop:
         self.IPv6Address = ipv6
 
     """
-    Return the binary representation of a DHT Hop, which can be appended to a DHT TRACE Message
+    Return the binary representation of a DHT Hop, which can be appended to a trace Message
 
     :returns: DHTHop in binary format
     :rtype: bytearray
@@ -349,6 +351,11 @@ class DHTHop:
 class DHTMessageERROR:
     """
     Generates an error message
+
+    :param requestType: The type of request
+    :type requestType: int
+    :param requestKey: The key
+    :type requestKey: int
     """
     def __init__(self, requestType, requestKey):
         frame = bytearray()
