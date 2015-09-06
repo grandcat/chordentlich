@@ -60,7 +60,8 @@ class DHTMessage():
         """
         Parse the message
 
-        ``self.message`` will automatically become the type of message specified with the command number (``DHTMessageGET``, ``DHTMessagePUT`` etc.)
+        ``self.message`` will automatically become the type of message specified with the
+        command number (``DHTMessageGET``, ``DHTMessagePUT`` etc.).
         """
         commandNumber =  int.from_bytes( self.data[2:4], byteorder='big')
         command = DHTCommands[commandNumber]
@@ -128,7 +129,7 @@ class DHTMessagePUT(DHTMessageParent):
 
         :rtype: int
         """
-        return  int.from_bytes( self.data[4:36], byteorder='big')
+        return  int.from_bytes(self.data[4:36], byteorder='big')
 
     def get_ttl(self):
         """
@@ -136,7 +137,7 @@ class DHTMessagePUT(DHTMessageParent):
 
         :rtype: int
         """
-        return int.from_bytes( self.data[36:38], byteorder='big')
+        return int.from_bytes(self.data[36:38], byteorder='big')
 
     def get_replication(self):
         """
@@ -144,7 +145,7 @@ class DHTMessagePUT(DHTMessageParent):
 
         :rtype: int
         """
-        return int.from_bytes( self.data[38:39], byteorder='big')
+        return int.from_bytes(self.data[38:39], byteorder='big')
 
     def get_reserved(self):
         return self.data[39:44]
@@ -154,7 +155,7 @@ class DHTMessagePUT(DHTMessageParent):
         Returns the content
 
         :returns: content
-        :rtype: bytearray
+        :rtype: bytes
         """
         return self.data[44:self.size]
 
@@ -313,12 +314,12 @@ class DHTHop:
 
     :param peerId: the peer id with a maximum length of 32 bytes
     :type peerId: Int
-    :param kxPort: the kx port with a maxmimum length of 2 bytes
+    :param kxPort: the KX port with a maximum length of 2 bytes
     :type kxPort: Int
     :param IPv4Address: For example 192.168.0.1
-    :type IPv4Address: String
+    :type IPv4Address: str
     :param IPv6Address: For example FE80:0000:0000:0000:0202:B3FF:FE1E:8329
-    :type IPv6Address: String
+    :type IPv6Address: str
     """
     def __init__(self, peerId, kxPort, IPv4Address, IPv6Address):
 
@@ -333,7 +334,7 @@ class DHTHop:
         self.IPv6Address = ipv6
 
     """
-    Return the binary representation of a DHT Hop, which can be appended to a trace Message
+    Return the binary representation of a DHT Hop, which can be appended to a trace message
 
     :returns: DHTHop in binary format
     :rtype: bytearray
