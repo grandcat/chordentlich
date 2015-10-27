@@ -1,3 +1,7 @@
+About
+======================
+Chord is a distributed hash table as described by Ion Stoica et al. We provide an implementation written in Python 3 developed for the course P2P Network Security at TU Munich.
+
 Paper
 ======================
 For more documentation see the paper available at:
