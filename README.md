@@ -8,7 +8,7 @@ For more documentation see the paper available at:
 https://rawgit.com/grandcat/chordentlich/master/docs/final_report/final_report.pdf
 
 and also the class documentation you find on:
-https://rawgit.com/grandcat/chordentlich/master/docs/api/index.html
+http://grandcat.github.io/chordentlich
 
 
 
