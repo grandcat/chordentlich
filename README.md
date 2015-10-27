@@ -1,3 +1,13 @@
+Paper
+======================
+For more documentation see the paper available at:
+https://rawgit.com/grandcat/chordentlich/master/docs/final_report/final_report.pdf
+
+and also the class documentation you find on:
+https://rawgit.com/grandcat/chordentlich/master/docs/api/index.html
+
+
+
 Setup for GNU/Linux Systems
 ======================
 You need to install  pip for python 3 first to install further packages.
