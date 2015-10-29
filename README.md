@@ -1,15 +1,21 @@
 About
 ======================
-Chord is a distributed hash table as described by Ion Stoica et al. We provide an implementation written in Python 3 developed for the course P2P Network Security at TU Munich.
+Chord is a distributed hash table as described by Ion Stoica et al [[1]]. We provide an implementation written in Python 3 developed for the course P2P Network Security at TU Munich.
 
-Paper
+Features
+--------
+* Simple key / value storage
+* Simple replication to handle failing or departing nodes (re-distribution missing)
+* Maintains several immediate successors for a stable and consistent Chord ring [[2]]
+* Public key or IP as peer identifier
+
+Documentation
 ======================
 For more documentation see the paper available at:
 https://rawgit.com/grandcat/chordentlich/master/docs/final_report/final_report.pdf
 
 and also the class documentation you find on:
 http://grandcat.github.io/chordentlich
-
 
 
 Setup for GNU/Linux Systems
@@ -25,8 +31,8 @@ on Fedora/RHEL/CentOS run
 
 now install the modules:
 ```
-pip3 install  jsonschema
-pip3 install  aiomas
+pip3 install jsonschema
+pip3 install aiomas
 ```
 
 Run nodes
@@ -69,7 +75,7 @@ Run `unittester.py` for the tests.
 Config file
 ======================
 
-No Section
+No SectionIon Stoica
 - HOSTKEY: Path to pem keyfile
 - LOG: Additional logfile path
 - PORT: Own port
@@ -105,3 +111,13 @@ Also make sure you provide the right config files. For the 5 default nodes gener
 by the python script these are located in the mnconfig folder.
 
 You need to provide an absolute path for the HOSTKEY here!
+
+
+References
+======================
+1: Ion Stoica et al., Chord: A Scalable Peer-to-peer Lookup Service for Internet Applications
+
+[1]: http://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf
+
+2: Pamela Zave, How To Make Chord Correct
+[2]: http://www2.research.att.com/~pamela/zave_podc.pdf
